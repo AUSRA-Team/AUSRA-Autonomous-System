@@ -1,0 +1,3 @@
+map_saver:
+  ros__parameters:
+    trial_name: "default_trial_name" # Fallback if not provided in CLI
