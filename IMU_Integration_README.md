@@ -147,9 +147,6 @@ ros2 topic echo /odometry/filtered
 4. Test on actual Jetson Orin Nano
 5. Test with swarm coordination system
 
-## Author
-[Your Name] - AUSRA Team  
-Date: December 2024
 
 ## Questions or Issues?
 Contact me or open an issue in this repository.
