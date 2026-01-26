@@ -1,17 +1,20 @@
 scan_to_scan_filter_chain:
   ros__parameters:
     filter1:
-      name: shadows
-      type: laser_filters/ScanShadowsFilter
-      params:
-        min_angle: 10.
-        max_angle: 170.
-        neighbors: 5
-        window: 1
-    # filter2:
-    #   name: dark_shadows
-    #   type: laser_filters/LaserScanIntensityFilter
-    #   params: 
-    #     lower_threshold: 100.
-    #     upper_threshold: 10000.
-    #     disp_histogram: 0
+      type: laser_filters/LaserArrayFilter
+      name: median
+      params: 
+        range_filter_chain:
+          filter1: 
+            name: median
+            type: filters/MultiChannelMedianFilterFloat 
+            params:
+              number_of_observations: 2
+              unused: 1
+        intensity_filter_chain:
+          filter1:
+            name: median
+            type: filters/MultiChannelMedianFilterFloat 
+            params:
+              number_of_observations: 2
+              unused: 1
