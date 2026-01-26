@@ -1,3 +1,4 @@
+#  version test 
 #!/usr/bin/env python3
 # ============================================================================
 # Cartographer Launch File for Omni-Wheel Robot in Gazebo
@@ -73,7 +74,7 @@ def generate_launch_description():
         ],
         remappings=[
             ('scan', '/scan'),
-           # ('odom', '/odom'),
+            ('odom', '/odom'),
         ]
     )
     
