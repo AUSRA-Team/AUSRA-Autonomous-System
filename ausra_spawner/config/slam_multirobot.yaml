@@ -1,0 +1,108 @@
+# ==============================================================================
+# SLAM Toolbox Configuration for Multi-Robot AUSRA System
+# ==============================================================================
+# Frame placeholders: <robot_namespace> will be replaced at launch time
+# Each robot runs its own SLAM instance in mapping mode
+# 
+# Based on slam_explorer/config/slam_omni_single_robot.yaml reference
+# ==============================================================================
+
+slam_toolbox:
+  ros__parameters:
+    # --------------------------------------------------------------------------
+    # Solver Settings
+    # --------------------------------------------------------------------------
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: HuberLoss
+
+    # --------------------------------------------------------------------------
+    # Frame Configuration (Multi-Robot)
+    # --------------------------------------------------------------------------
+    # CRITICAL: These frames must match the robot's TF tree
+    odom_frame: <robot_namespace>_odom
+    map_frame: map
+    base_frame: <robot_namespace>_robot_footprint
+    scan_topic: scan
+    
+    # Map publishing - publishes to namespaced topic (e.g., /ausra_1/map)
+    map_topic: map
+    map_name: map
+    use_map_saver: true
+    
+    # Operating mode
+    mode: mapping
+
+    # --------------------------------------------------------------------------
+    # General Settings - OPTIMIZED for stable mapping (updated from slam_explorer)
+    # --------------------------------------------------------------------------
+    use_sim_time: true
+    debug_logging: false
+    throttle_scans: 1                     # Process every scan for better accuracy
+    transform_publish_period: 0.02        # 50Hz TF publishing for smooth transforms
+    map_update_interval: 0.5              # Faster map updates
+    resolution: 0.05
+    restamp_tf: true                      # ENABLED - helps TF timing (from slam_explorer)
+    max_laser_range: 12.0                 # Use FULL laser range
+    min_laser_range: 0.12                 # Allow closer readings
+    minimum_time_interval: 0.05           # Faster processing
+    transform_timeout: 0.3                # Tighter timeout for fresher TF
+    tf_buffer_duration: 10.0              # Smaller buffer = less memory
+    stack_size_to_use: 40000000
+    enable_interactive_mode: true         # ENABLED - allows runtime adjustments
+
+    # --------------------------------------------------------------------------
+    # Scan Matching Settings - TIGHT for stable pose estimation (from slam_explorer)
+    # --------------------------------------------------------------------------
+    use_scan_matching: true
+    use_scan_barycenter: true
+    minimum_travel_distance: 0.05         # Very small movement triggers update
+    minimum_travel_heading: 0.08          # Small rotation before update (~4.5 deg)
+    check_min_dist_and_heading_precisely: true  # Precise checks
+    scan_buffer_size: 20                  # Larger buffer for better matching (from slam_explorer)
+    scan_buffer_maximum_scan_distance: 12.0  # FULL laser range (12m sensor)
+    link_match_minimum_response_fine: 0.9    # VERY high confidence required
+    link_scan_maximum_distance: 0.3          # Very tight constraint
+
+    # --------------------------------------------------------------------------
+    # Loop Closing Settings - CONSERVATIVE from slam_explorer
+    # --------------------------------------------------------------------------
+    # Loop closing enabled with very strict thresholds to prevent false loops
+    # This allows gradual map correction while avoiding sudden jumps
+    do_loop_closing: true                    # ENABLED with conservative params
+    loop_search_maximum_distance: 2.0        # Only close very local loops
+    loop_match_minimum_chain_size: 30        # Need more evidence
+    loop_match_maximum_variance_coarse: 0.15 # Stricter matching (from slam_explorer)
+    loop_match_minimum_response_coarse: 0.75 # Higher confidence required
+    loop_match_minimum_response_fine: 0.85   # Very high confidence for fine match
+
+    # --------------------------------------------------------------------------
+    # Correlation Parameters (TUNED for tight matching and less drift)
+    # --------------------------------------------------------------------------
+    correlation_search_space_dimension: 0.3   # Smaller search = tighter matching
+    correlation_search_space_resolution: 0.003  # Very fine resolution
+    correlation_search_space_smear_deviation: 0.005  # Less smear = sharper
+
+    # --------------------------------------------------------------------------
+    # Loop Search Parameters
+    # --------------------------------------------------------------------------
+    loop_search_space_dimension: 5.0
+    loop_search_space_resolution: 0.01
+    loop_search_space_smear_deviation: 0.02
+
+    # --------------------------------------------------------------------------
+    # Penalty Parameters (from reference)
+    # --------------------------------------------------------------------------
+    distance_variance_penalty: 0.5
+    angle_variance_penalty: 0.3
+    fine_search_angle_offset: 0.0005
+    coarse_search_angle_offset: 0.2
+    coarse_angle_resolution: 0.0349
+    minimum_angle_penalty: 0.2
+    minimum_distance_penalty: 0.1
+    use_response_expansion: true
+    min_pass_through: 20
+    occupancy_threshold: 0.3              # Added from reference

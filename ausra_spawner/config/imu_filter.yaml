@@ -1,0 +1,47 @@
+# ==============================================================================
+# IMU Complementary Filter Configuration for Multi-Robot AUSRA System
+# ==============================================================================
+# Based on slam_explorer/config/imu_complimentary_filter.yaml reference
+# Provides filtered IMU data to EKF for better state estimation
+# ==============================================================================
+
+complementary_filter_gain_node:
+  ros__parameters:
+    # Filter gains
+    gain_acc: 0.01          # Accelerometer gain
+    gain_mag: 0.01          # Magnetometer gain (unused if use_mag: false)
+    bias_alpha: 0.01        # Bias estimation smoothing
+    
+    # Features
+    do_bias_estimation: true
+    do_adaptive_gain: true
+    use_mag: false          # Disable magnetometer (not available on AUSRA)
+    
+    # TF settings
+    fixed_frame: "odom"
+    publish_tf: false       # Don't publish TF - omni_driver handles that
+    reverse_tf: false
+    
+    # Timing
+    constant_dt: 0.0        # Use message timestamps
+    
+    # Debug
+    publish_debug_topics: false
+
+    # QoS settings
+    qos_overrides:
+      /imu/data_raw:
+        subscription:
+          depth: 10
+          durability: volatile
+          history: keep_last
+          reliability: reliable
+
+      /imu/mag:
+        subscription:
+          depth: 10
+          durability: volatile
+          history: keep_last
+          reliability: reliable
+
+    use_sim_time: true

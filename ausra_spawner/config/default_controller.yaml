@@ -1,0 +1,21 @@
+# Default controller configuration
+# This file is used as a template - actual configs are generated dynamically
+# by the spawn_ausra.launch.py launch file with proper robot_name prefix
+
+controller_manager:
+  ros__parameters:
+    update_rate: 20
+    use_sim_time: true
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    joint_group_velocity_controller:
+      type: velocity_controllers/JointGroupVelocityController
+
+joint_group_velocity_controller:
+  ros__parameters:
+    joints:
+      - ausrabot_joint_1
+      - ausrabot_joint_2
+      - ausrabot_joint_3

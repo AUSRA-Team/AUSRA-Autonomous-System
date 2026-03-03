@@ -1,0 +1,142 @@
+# ==============================================================================
+# EKF Localization Configuration for AUSRA Omnidirectional Robot
+# ==============================================================================
+# This file supports both single-robot and multi-robot operation:
+# - For single robot: use as-is with standard frame names
+# - For multi-robot: use RewrittenYaml to replace <robot_namespace> placeholders
+#
+# The EKF fuses wheel odometry, twist, and IMU data for robust state estimation
+# ==============================================================================
+
+ekf_filter_node:
+  ros__parameters:
+    use_sim_time: true
+    
+    # --------------------------------------------------------------------------
+    # General Settings
+    # --------------------------------------------------------------------------
+    frequency: 20.0
+    sensor_timeout: 0.1
+    two_d_mode: true
+    transform_time_offset: 0.0
+    transform_timeout: 0.0
+    print_diagnostics: false
+    debug: false
+    permit_corrected_publication: false
+    publish_acceleration: true
+    publish_tf: true
+
+    # --------------------------------------------------------------------------
+    # Frame Configuration
+    # --------------------------------------------------------------------------
+    # For multi-robot, replace with: <robot_namespace>_odom, <robot_namespace>_robot_footprint
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: robot_footprint
+    world_frame: odom
+
+    # --------------------------------------------------------------------------
+    # Odometry Input (from omni_driver)
+    # --------------------------------------------------------------------------
+    # Provides pose (x, y, yaw) and velocity (vx, vy, vyaw)
+    odom0: odom
+    odom0_config: [true,  true,  false,    # x, y, z position
+                   false, false, true,     # roll, pitch, yaw
+                   true,  true,  false,    # vx, vy, vz velocities
+                   false, false, true,     # vroll, vpitch, vyaw
+                   false, false, false]    # ax, ay, az
+    odom0_queue_size: 10
+    odom0_nodelay: false
+    odom0_differential: false
+    odom0_relative: false
+    odom0_pose_rejection_threshold: 5.0
+    odom0_twist_rejection_threshold: 1.0
+
+    # --------------------------------------------------------------------------
+    # Twist Input (from omni_driver with covariance)
+    # --------------------------------------------------------------------------
+    # Provides velocity measurements with covariance
+    twist0: twist_with_covariance
+    twist0_config: [false, false, false,   # x, y, z position
+                    false, false, false,   # roll, pitch, yaw
+                    true,  true,  false,   # vx, vy, vz velocities
+                    false, false, true,    # vroll, vpitch, vyaw
+                    false, false, false]   # ax, ay, az
+    twist0_queue_size: 10
+    twist0_rejection_threshold: 2.0
+    twist0_nodelay: false
+
+    # --------------------------------------------------------------------------
+    # IMU Input (angular velocities only - from slam_explorer)
+    # --------------------------------------------------------------------------
+    # Using only angular velocity from IMU is more reliable in simulation
+    # Orientation from IMU can conflict with SLAM-derived yaw
+    # Acceleration is often noisy in simulation environments
+    imu0: imu
+    imu0_config: [false, false, false,     # x, y, z position
+                  false, false, false,     # roll, pitch, yaw (DISABLED - let SLAM handle)
+                  false, false, false,     # vx, vy, vz
+                  true,  true,  true,      # vroll, vpitch, vyaw (angular vel - USED)
+                  false, false, false]     # ax, ay, az (DISABLED - often noisy)
+    imu0_nodelay: false
+    imu0_differential: false
+    imu0_relative: true
+    imu0_queue_size: 10
+    imu0_pose_rejection_threshold: 0.8
+    imu0_twist_rejection_threshold: 0.8
+    imu0_linear_acceleration_rejection_threshold: 0.8
+    imu0_remove_gravitational_acceleration: true
+
+    # --------------------------------------------------------------------------
+    # Control Command Integration (for omnidirectional robot)
+    # --------------------------------------------------------------------------
+    # Uses cmd_vel to help predict state during sensor delays
+    use_control: true
+    stamped_control: false
+    control_timeout: 0.2
+    # Control config: vx, vy, vz, vroll, vpitch, vyaw
+    control_config: [true, true, false, false, false, true]
+    # Kinematic limits for AUSRA omni robot
+    acceleration_limits: [1.3, 1.3, 0.0, 0.0, 0.0, 3.4]
+    deceleration_limits: [1.3, 1.3, 0.0, 0.0, 0.0, 3.4]
+    acceleration_gains: [0.8, 0.8, 0.0, 0.0, 0.0, 0.9]
+    deceleration_gains: [1.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+
+    # --------------------------------------------------------------------------
+    # Process Noise Covariance
+    # --------------------------------------------------------------------------
+    # Order: x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az
+    process_noise_covariance: [0.05, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.05, 0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.06, 0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.03, 0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.03, 0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.06, 0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.025, 0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.025, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.04, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.01, 0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.01, 0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.02, 0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.015]
+
+    # --------------------------------------------------------------------------
+    # Initial State Covariance
+    # --------------------------------------------------------------------------
+    initial_estimate_covariance: [1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 1e-9,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  1.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  1e-9]

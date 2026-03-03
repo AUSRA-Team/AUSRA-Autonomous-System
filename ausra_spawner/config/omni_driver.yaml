@@ -1,0 +1,23 @@
+# Omnidirectional Driver Configuration for AUSRA Robot
+# Joint names and frame names use placeholders: <robot_namespace> will be replaced at launch time
+
+omnidirectional_driver:
+  ros__parameters:
+    # Wheel configuration (joint names are robot-specific)
+    wheel_names:
+      - <robot_namespace>_joint_1
+      - <robot_namespace>_joint_2
+      - <robot_namespace>_joint_3
+    
+    # Robot geometry
+    robot_radius: 0.124
+    wheel_radius: 0.0325
+    wheel_angles_deg: [270.0, 30.0, 150.0]
+    roller_angle_deg: 0.0
+    
+    # Control settings
+    use_field_centric: false
+    
+    # Frame IDs
+    odom_frame_id: <robot_namespace>_odom
+    base_frame_id: <robot_namespace>_robot_footprint

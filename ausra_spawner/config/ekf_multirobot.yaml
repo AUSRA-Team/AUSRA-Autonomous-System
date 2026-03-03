@@ -1,0 +1,118 @@
+# ==============================================================================
+# EKF Localization Configuration for Multi-Robot AUSRA System
+# ==============================================================================
+# Frame placeholders: <robot_namespace> will be replaced at launch time
+# Each robot runs its own EKF instance for sensor fusion
+#
+# Tuned for omnidirectional robot with IMU and control command integration
+# Based on slam_explorer/config/ekf.yaml reference
+# ==============================================================================
+
+ekf_filter_node:
+  ros__parameters:
+    # --------------------------------------------------------------------------
+    # General Settings - REDUCED FREQUENCY for system load
+    # --------------------------------------------------------------------------
+    use_sim_time: true
+    frequency: 10.0
+    sensor_timeout: 0.5
+    two_d_mode: true
+    transform_time_offset: 0.0
+    transform_timeout: 0.5
+    print_diagnostics: false
+    debug: false
+    permit_corrected_publication: false
+    publish_acceleration: false
+    # CRITICAL: EKF publishes odom→base TF (omni_driver TF is disabled)
+    # This provides IMU-corrected orientation in the TF tree
+    publish_tf: true
+
+    # --------------------------------------------------------------------------
+    # Frame Configuration (Multi-Robot)
+    # --------------------------------------------------------------------------
+    # CRITICAL: These frames must match the robot's TF tree
+    map_frame: map
+    odom_frame: <robot_namespace>_odom
+    base_link_frame: <robot_namespace>_robot_footprint
+    world_frame: <robot_namespace>_odom
+
+    # --------------------------------------------------------------------------
+    # Odometry Input (from omni_driver)
+    # --------------------------------------------------------------------------
+    # Use wheel odometry for position and velocity
+    # IMU will correct the orientation (yaw)
+    odom0: odom
+    odom0_config: [true,  true,  false,    # x, y, z position from wheels
+                   false, false, false,    # roll, pitch, yaw (from IMU!)
+                   true,  true,  false,    # vx, vy, vz velocities
+                   false, false, false,    # vroll, vpitch, vyaw (from IMU!)
+                   false, false, false]    # ax, ay, az
+    odom0_queue_size: 10
+    odom0_nodelay: false
+    odom0_differential: false              # Use absolute position from odom
+    odom0_relative: false
+    odom0_pose_rejection_threshold: 5.0
+    odom0_twist_rejection_threshold: 2.0
+
+    # --------------------------------------------------------------------------
+    # IMU Input (directly from Gazebo - no filter needed)
+    # --------------------------------------------------------------------------
+    # Use IMU for yaw orientation ONLY - this is the truth source
+    imu0: imu
+    imu0_config: [false, false, false,     # x, y, z position
+                  false, false, true,      # roll, pitch, YAW from IMU
+                  false, false, false,     # vx, vy, vz
+                  false, false, true,      # vroll, vpitch, VYAW from IMU
+                  false, false, false]     # ax, ay, az (disabled)
+    imu0_nodelay: false
+    imu0_differential: false               # Use ABSOLUTE orientation
+    imu0_relative: false
+    imu0_queue_size: 10
+    imu0_pose_rejection_threshold: 0.8
+    imu0_twist_rejection_threshold: 0.8
+    imu0_linear_acceleration_rejection_threshold: 0.8
+    imu0_remove_gravitational_acceleration: true
+
+    # --------------------------------------------------------------------------
+    # Control Command Integration - DISABLED for simplicity
+    # --------------------------------------------------------------------------
+    use_control: false
+
+    # --------------------------------------------------------------------------
+    # Process Noise Covariance
+    # --------------------------------------------------------------------------
+    # Order: x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az
+    process_noise_covariance: [0.05, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.05, 0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.06, 0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.03, 0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.03, 0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.06, 0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.025, 0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.025, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.04, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.01, 0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.01, 0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.02, 0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.015]
+
+    # --------------------------------------------------------------------------
+    # Initial State Covariance
+    # --------------------------------------------------------------------------
+    initial_estimate_covariance: [1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 1e-9,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  1.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  1e-9]

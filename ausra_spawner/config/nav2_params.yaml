@@ -1,0 +1,464 @@
+# ==============================================================================
+# Nav2 Multi-Robot Parameters for AUSRA Omni-directional Robot
+# ==============================================================================
+# This configuration uses <robot_namespace> as placeholder for dynamic replacement
+# at launch time. All frame names follow the pattern: <robot_namespace>_frame_name
+#
+# Key Multi-Robot Design Decisions:
+# - All robots share the global 'map' frame
+# - Each robot has isolated odom and base frames (e.g., ausra_1_odom, ausra_1_robot_footprint)
+# - Topics are namespaced (e.g., /ausra_1/scan, /ausra_1/odom)
+# - Uses DWB controller for omni-directional motion
+# ==============================================================================
+
+# Use wildcard to apply parameters to all nodes regardless of namespace
+"/**":
+  ros__parameters:
+    use_sim_time: true
+
+# ------------------------------------------------------------------------------
+# AMCL - Adaptive Monte Carlo Localization (for post-SLAM localization mode)
+# ------------------------------------------------------------------------------
+amcl:
+  ros__parameters:
+    use_sim_time: true
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    base_frame_id: <robot_namespace>_robot_footprint
+    global_frame_id: map
+    odom_frame_id: <robot_namespace>_odom
+    scan_topic: scan
+    robot_model_type: "nav2_amcl::OmniMotionModel"
+    tf_broadcast: true
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      yaw: 0.0
+    set_initial_pose: true
+    max_beams: 60
+    min_particles: 500
+    max_particles: 2000
+    pf_err: 0.05
+    pf_z: 0.99
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+    resample_interval: 1
+    transform_tolerance: 1.0
+    update_min_a: 0.2
+    update_min_d: 0.25
+    z_hit: 0.5
+    z_max: 0.05
+    z_rand: 0.5
+    z_short: 0.05
+    lambda_short: 0.1
+    sigma_hit: 0.2
+    laser_max_range: 12.0
+    laser_min_range: 0.15
+    laser_model_type: "likelihood_field"
+    likelihood_field:
+      max_dist: 2.0
+      max_occ_dist: 2.0
+
+# ------------------------------------------------------------------------------
+# BT Navigator - Behavior Tree Navigator
+# ------------------------------------------------------------------------------
+bt_navigator:
+  ros__parameters:
+    use_sim_time: true
+    global_frame: map
+    robot_base_frame: <robot_namespace>_robot_footprint
+    odom_topic: odom
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    wait_for_service_timeout: 1000
+    action_server_result_timeout: 900.0
+    navigators: ["navigate_to_pose", "navigate_through_poses"]
+    navigate_to_pose:
+      plugin: "nav2_bt_navigator/NavigateToPoseNavigator"
+    navigate_through_poses:
+      plugin: "nav2_bt_navigator/NavigateThroughPosesNavigator"
+    # BT Node plugins available in ROS 2 Humble
+    plugin_lib_names:
+      - nav2_compute_path_to_pose_action_bt_node
+      - nav2_compute_path_through_poses_action_bt_node
+      - nav2_smooth_path_action_bt_node
+      - nav2_follow_path_action_bt_node
+      - nav2_spin_action_bt_node
+      - nav2_wait_action_bt_node
+      - nav2_assisted_teleop_action_bt_node
+      - nav2_back_up_action_bt_node
+      - nav2_drive_on_heading_bt_node
+      - nav2_clear_costmap_service_bt_node
+      - nav2_is_stuck_condition_bt_node
+      - nav2_goal_reached_condition_bt_node
+      - nav2_goal_updated_condition_bt_node
+      - nav2_globally_updated_goal_condition_bt_node
+      - nav2_is_path_valid_condition_bt_node
+      - nav2_initial_pose_received_condition_bt_node
+      - nav2_reinitialize_global_localization_service_bt_node
+      - nav2_rate_controller_bt_node
+      - nav2_distance_controller_bt_node
+      - nav2_speed_controller_bt_node
+      - nav2_truncate_path_action_bt_node
+      - nav2_truncate_path_local_action_bt_node
+      - nav2_goal_updater_node_bt_node
+      - nav2_recovery_node_bt_node
+      - nav2_pipeline_sequence_bt_node
+      - nav2_round_robin_node_bt_node
+      - nav2_transform_available_condition_bt_node
+      - nav2_time_expired_condition_bt_node
+      - nav2_distance_traveled_condition_bt_node
+      - nav2_single_trigger_bt_node
+      - nav2_goal_updated_controller_bt_node
+      - nav2_is_battery_low_condition_bt_node
+      - nav2_is_battery_charging_condition_bt_node
+      - nav2_navigate_through_poses_action_bt_node
+      - nav2_navigate_to_pose_action_bt_node
+      - nav2_remove_passed_goals_action_bt_node
+      - nav2_planner_selector_bt_node
+      - nav2_controller_selector_bt_node
+      - nav2_goal_checker_selector_bt_node
+      - nav2_controller_cancel_bt_node
+      - nav2_path_longer_on_approach_bt_node
+      - nav2_wait_cancel_bt_node
+      - nav2_spin_cancel_bt_node
+      - nav2_back_up_cancel_bt_node
+      - nav2_assisted_teleop_cancel_bt_node
+      - nav2_drive_on_heading_cancel_bt_node
+
+# ------------------------------------------------------------------------------
+# Controller Server - MPPI for Omni-directional Robot
+# ------------------------------------------------------------------------------
+# MPPI is a model-predictive controller that handles omnidirectional motion well
+controller_server:
+  ros__parameters:
+    use_sim_time: true
+    controller_frequency: 20.0         # MPPI runs well at 20Hz
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.3
+    progress_checker_plugins: ["progress_checker"]
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+    odom_topic: odom
+
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.1
+      movement_time_allowance: 15.0
+
+    general_goal_checker:
+      stateful: true
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.5       # Relaxed yaw for omni robot
+
+    # MPPI Controller for OMNIDIRECTIONAL robot
+    FollowPath:
+      plugin: "nav2_mppi_controller::MPPIController"
+      time_steps: 40                 # Restore reasonable horizon
+      model_dt: 0.05                 # 50ms per step = 2.0s horizon
+      batch_size: 1000               # Reduce batch size to ensure realtime performance
+      iteration_count: 1             # MPPI iterations per control cycle
+      temperature: 0.25              # Lower = more greedy trajectory selection
+      gamma: 0.015                   # Control smoothness
+      motion_model: "Omni"           # OMNIDIRECTIONAL motion model
+      visualize: false               # Set true for debugging only
+      retry_attempt_limit: 2
+      regenerate_noises: false
+      
+      # Velocity limits for omni robot - SYMMETRIC for all directions
+      vx_max: 0.5
+      vx_min: -0.5                   # Full reverse for omni
+      vy_max: 0.5                    # Full lateral movement
+      wz_max: 1.0                    # Moderate rotation
+      
+      # Sampling noise - sample all directions equally
+      vx_std: 0.2
+      vy_std: 0.2
+      wz_std: 0.25
+      
+      # Path handling
+      prune_distance: 1.5
+      transform_tolerance: 0.2
+      
+      # Trajectory visualization (for debugging)
+      TrajectoryVisualizer:
+        trajectory_step: 5
+        time_step: 3
+      
+      # Critics for OMNI robot - STRONG obstacle avoidance
+      critics: ["ConstraintCritic", "CostCritic", "ObstaclesCritic", "GoalCritic", "PathAlignCritic", "PathFollowCritic"]
+      
+      ConstraintCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 4.0
+      
+      # CostCritic - Uses costmap costs (inflation) for obstacle avoidance
+      CostCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 10.0            # VERY Strong weight on costmap costs
+        critical_cost: 200           # Trajectories with cost > 200 are rejected
+        consider_footprint: true     # Check full footprint
+        collision_cost: 1000000.0    # Huge cost for collision
+        near_goal_distance: 0.5
+        trajectory_point_step: 2
+      
+      # ObstaclesCritic - Direct obstacle avoidance using laser data
+      # Note: This requires the costmap 2d collision checker
+      ObstaclesCritic:
+        enabled: true
+        cost_power: 1
+        repulsion_weight: 2.0        # Repulsion force from obstacles
+        critical_weight: 20.0        # Penalty near collisions
+        consider_footprint: true     # Check full footprint for omni
+        collision_cost: 1000000.0    # Huge cost for collision
+        collision_margin_distance: 0.25  # Start avoiding at 25cm from obstacle
+        near_goal_distance: 0.5
+      
+      GoalCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        threshold_to_consider: 1.4
+      
+      PathAlignCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        max_path_occupancy_ratio: 0.10
+        trajectory_point_step: 4
+        threshold_to_consider: 0.5
+        offset_from_furthest: 20
+        use_path_orientations: false
+      
+      PathFollowCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.0
+        offset_from_furthest: 5
+        threshold_to_consider: 1.4
+
+# ------------------------------------------------------------------------------
+# Local Costmap - Rolling window around robot
+# ------------------------------------------------------------------------------
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: true
+      update_frequency: 10.0     # Fast updates for MPPI obstacle detection
+      publish_frequency: 5.0
+      global_frame: <robot_namespace>_odom
+      robot_base_frame: <robot_namespace>_robot_footprint
+      rolling_window: true
+      width: 6                   # Larger for MPPI prediction horizon
+      height: 6
+      resolution: 0.05
+      robot_radius: 0.15
+      plugins: ["obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+          raytrace_max_range: 4.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 4.0
+          obstacle_min_range: 0.0
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 5.0    # Gentler falloff - costs spread further
+        inflation_radius: 0.60      # Larger inflation for MPPI to see obstacles
+      always_send_full_costmap: true
+
+# ------------------------------------------------------------------------------
+# Global Costmap - LARGE static map for exploration A* planning
+# ------------------------------------------------------------------------------
+# For exploration: ONLY laser-detected obstacles are blocked
+# Everything else (unknown, unvisited, outside sensor range) is FREE
+# Use a VERY LARGE static costmap so goals are never "outside"
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: true
+      update_frequency: 2.0        # Update with laser data
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: <robot_namespace>_robot_footprint
+      robot_radius: 0.15
+      resolution: 0.05
+      # CRITICAL: Treat unknown as FREE - only laser obstacles block
+      track_unknown_space: false   # Unknown = FREE for A* planning  
+      unknown_cost_value: 0        # Unknown cells cost 0 (traversable)
+      lethal_cost_threshold: 100   # Only actual obstacles are lethal
+      trinary_costmap: false       # Full cost gradient
+      # STATIC large costmap centered at origin - covers entire exploration area
+      rolling_window: false        # STATIC - not rolling with robot
+      width: 100                   # 100m x 100m = covers huge area
+      height: 100
+      origin_x: -50.0              # Centered at (0,0) - covers -50 to +50
+      origin_y: -50.0
+      # Only obstacle layer from laser + inflation
+      plugins: ["obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: scan
+          max_obstacle_height: 2.0
+          clearing: true           # Laser clears obstacles it can see through
+          marking: true            # Laser marks obstacles it detects
+          data_type: "LaserScan"
+          raytrace_max_range: 12.0  # Full laser range for clearing
+          raytrace_min_range: 0.0
+          obstacle_max_range: 12.0  # Full laser range for marking
+          obstacle_min_range: 0.0
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0     # Gentler falloff - A* feels costs further out
+        inflation_radius: 0.50       # Larger inflation - A* avoids obstacles better
+      always_send_full_costmap: false  # Too large - send updates only
+
+# ------------------------------------------------------------------------------
+# Planner Server - SmacPlanner2D with Optimized A*
+# ------------------------------------------------------------------------------
+# A* for exploration: plan through FREE space, avoid ONLY laser obstacles
+planner_server:
+  ros__parameters:
+    use_sim_time: true
+    expected_planner_frequency: 5.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_smac_planner/SmacPlanner2D"
+      tolerance: 0.5                     # Goal tolerance
+      downsample_costmap: false          # NO downsampling - full resolution for obstacle detection
+      downsampling_factor: 1             # Ignored when downsample_costmap=false
+      allow_unknown: true                # Plan through unknown (all FREE anyway)
+      max_iterations: 1000000            # High for large costmap
+      max_on_approach_iterations: 1000   
+      max_planning_time: 5.0             # More time for large costmap
+      cost_travel_multiplier: 50.0       # HIGH cost penalty - strongly avoid inflated areas
+      use_final_approach_orientation: false  # Omni robot
+
+# ------------------------------------------------------------------------------
+# Smoother Server
+# ------------------------------------------------------------------------------
+smoother_server:
+  ros__parameters:
+    use_sim_time: true
+    smoother_plugins: ["simple_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1.0e-10
+      max_its: 1000
+      do_refinement: true
+
+# ------------------------------------------------------------------------------
+# Behavior Server
+# ------------------------------------------------------------------------------
+behavior_server:
+  ros__parameters:
+    use_sim_time: true
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "assisted_teleop", "wait"]
+    spin:
+      plugin: "nav2_behaviors/Spin"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors/DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+    assisted_teleop:
+      plugin: "nav2_behaviors/AssistedTeleop"
+    local_frame: <robot_namespace>_odom
+    global_frame: map
+    robot_base_frame: <robot_namespace>_robot_footprint
+    transform_tolerance: 0.5    # Increased from 0.2
+    simulate_ahead_time: 2.0
+    # Faster behaviors for omni robot
+    max_rotational_vel: 1.5
+    min_rotational_vel: 0.3
+    rotational_acc_lim: 3.5
+    # Enable lateral motion for backup behavior
+    enable_stamped_cmd_vel: false
+
+# ------------------------------------------------------------------------------
+# Waypoint Follower
+# ------------------------------------------------------------------------------
+waypoint_follower:
+  ros__parameters:
+    use_sim_time: true
+    loop_rate: 20
+    stop_on_failure: false
+    action_server_result_timeout: 900.0
+    waypoint_task_executor_plugin: "wait_at_waypoint"
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: true
+      waypoint_pause_duration: 200
+
+# ------------------------------------------------------------------------------
+# Velocity Smoother
+# ------------------------------------------------------------------------------
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: true
+    smoothing_frequency: 20.0
+    scale_velocities: false
+    feedback: "OPEN_LOOP"
+    max_velocity: [0.5, 0.5, 1.0]
+    min_velocity: [-0.5, -0.5, -1.0]
+    max_accel: [2.5, 2.5, 3.2]
+    max_decel: [-2.5, -2.5, -3.2]
+    odom_topic: odom
+    odom_duration: 0.1
+    deadband_velocity: [0.0, 0.0, 0.0]
+    velocity_timeout: 1.0
+
+# ------------------------------------------------------------------------------
+# Collision Monitor
+# ------------------------------------------------------------------------------
+collision_monitor:
+  ros__parameters:
+    use_sim_time: true
+    base_frame_id: <robot_namespace>_robot_footprint
+    odom_frame_id: <robot_namespace>_odom
+    cmd_vel_in_topic: cmd_vel_smoothed
+    cmd_vel_out_topic: cmd_vel
+    state_topic: collision_monitor_state
+    transform_tolerance: 0.5    # Increased from 0.2
+    source_timeout: 1.0
+    base_shift_correction: true
+    stop_pub_timeout: 2.0
+    polygons: ["FootprintApproach"]
+    FootprintApproach:
+      type: "polygon"
+      action_type: "approach"
+      footprint_topic: local_costmap/published_footprint
+      time_before_collision: 2.0
+      simulation_time_step: 0.1
+      min_points: 6
+      visualize: false
+      enabled: true
+    observation_sources: ["scan"]
+    scan:
+      type: "scan"
+      topic: scan
+      min_height: 0.15
+      max_height: 2.0
+      enabled: true

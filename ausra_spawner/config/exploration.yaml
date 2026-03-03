@@ -1,0 +1,16 @@
+# Frontier Exploration Configuration for AUSRA Robot
+# Frame names use placeholders: <robot_namespace> will be replaced at launch time
+
+exploration_server:
+  ros__parameters:
+    robot_base_frame: <robot_namespace>_robot_footprint
+    global_frame: map
+    map_topic: map
+    robot_radius: 0.15
+    inflation_radius: 0.35
+    min_frontier_size: 1.0                # Increased - ignore small frontiers
+    potential_scale: 3.0
+    orientation_scale: 0.0
+    gain_scale: 1.0
+    transform_tolerance: 1.0              # Increased for system load
+    visualize: true

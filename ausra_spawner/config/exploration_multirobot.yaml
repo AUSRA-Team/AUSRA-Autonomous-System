@@ -1,0 +1,81 @@
+# ==============================================================================
+# Frontier Exploration Configuration for Multi-Robot AUSRA System
+# ==============================================================================
+# Frame placeholders: <robot_namespace> will be replaced at launch time
+# Each robot runs its own exploration instance
+# ==============================================================================
+
+exploration_server:
+  ros__parameters:
+    use_sim_time: true
+    
+    # --------------------------------------------------------------------------
+    # Frame Configuration (Multi-Robot)
+    # --------------------------------------------------------------------------
+    robot_base_frame: <robot_namespace>_robot_footprint
+    global_frame: map
+    
+    # --------------------------------------------------------------------------
+    # Map & Navigation Settings
+    # --------------------------------------------------------------------------
+    map_topic: /<robot_namespace>/map  # Absolute path to SLAM map topic
+    navigate_to_pose_action: navigate_to_pose
+    
+    # --------------------------------------------------------------------------
+    # Robot Physical Parameters
+    # --------------------------------------------------------------------------
+    robot_radius: 0.15
+    inflation_radius: 0.35
+    
+    # --------------------------------------------------------------------------
+    # Frontier Detection Settings
+    # --------------------------------------------------------------------------
+    min_frontier_size: 8              # Larger frontier required (ignore noise)
+    frontier_cost_threshold: 252      # Cost threshold for frontier detection
+    safety_ratio: 0.90                # Relaxed ratio for better frontier access
+    
+    # Bounds checking - reject frontiers outside reasonable map bounds
+    max_frontier_distance: 15.0       # Max distance from robot to frontier (meters)
+    min_frontier_distance: 0.3        # Min distance (avoid frontiers on robot)
+    
+    # --------------------------------------------------------------------------
+    # Exploration Behavior
+    # --------------------------------------------------------------------------
+    coverage_threshold: 0.90          # Stop when map is this % explored (90%)
+    blacklist_timeout: 10.0           # Faster clearing of failed frontiers
+    exploration_loop_rate: 2.0        # Hz for exploration loop (balanced)
+    
+    # --------------------------------------------------------------------------
+    # Goal Selection Strategy (from m-explore-ros2)
+    # --------------------------------------------------------------------------
+    # Cost formula: cost = potential_scale * distance - gain_scale * size
+    # Lower cost is better, so:
+    #   - Higher potential_scale = prefer closer frontiers
+    #   - Higher gain_scale = prefer larger frontiers (more unexplored area)
+    goal_selection_strategy: cost_based   # Changed from 'closest' to 'cost_based'
+    
+    # Cost-based selection weights (from m-explore-ros2)
+    potential_scale: 2.0              # Weight for distance penalty
+    gain_scale: 0.1                   # Weight for frontier size bonus
+    
+    # Legacy weights (for backward compatibility)
+    distance_weight: 1.0
+    size_weight: 0.5
+    
+    # --------------------------------------------------------------------------
+    # Return to Home Settings
+    # --------------------------------------------------------------------------
+    return_to_start_on_complete: true
+    start_position_tolerance: 0.3     # Tolerance for reaching start position
+    
+    # --------------------------------------------------------------------------
+    # Map Saving Settings
+    # --------------------------------------------------------------------------
+    save_map_on_complete: true        # Save map when exploration completes
+    map_save_path: /tmp/<robot_namespace>_map  # Path for saved map files
+    
+    # --------------------------------------------------------------------------
+    # Visualization
+    # --------------------------------------------------------------------------
+    visualize_frontiers: true
+    frontier_marker_topic: exploration/frontiers
