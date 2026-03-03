@@ -8,10 +8,18 @@ The system implements a high-level/low-level architecture. A **Jetson Orin Nano*
 
 ![AUSRA System Architecture](Docs/system_architecture.png)
 
-## Build Instructions
+## Dependencies & Prerequisites
 
-To build the autonomy stack and the spawner package:
+This package integrates several standard ROS 2 autonomy stacks. Ensure they are installed via `apt`:
 ```bash
+sudo apt update
+sudo apt install ros-humble-navigation2 \
+                 ros-humble-nav2-bringup \
+                 ros-humble-slam-toolbox \
+                 ros-humble-robot-localization
+```
+
+## Build Instructions
 cd ~/ausra_gp
 colcon build --packages-select AUSRA-Autonomous-System ausra_spawner --symlink-install
 source install/setup.bash
