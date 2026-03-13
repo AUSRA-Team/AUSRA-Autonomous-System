@@ -1,0 +1,23 @@
+# PyTorch CUDA 12.4
+--extra-index-url https://download.pytorch.org/whl/cu124
+
+# Core Deep Learning & YOLO
+torch
+torchvision
+torchaudio
+ultralytics
+
+# Data Manipulation & Visualization
+numpy
+matplotlib
+seaborn
+pandas          
+
+# Image Processing & Hardware
+opencv-python   
+depthai         # The official Luxonis API needed to interface with OAK-D Lite
+
+# Utilities
+PyYAML          # Crucial for reading and writing YOLO dataset .yaml files
+tqdm            # Adds clean progress bars to terminal when looping through large datasets
+scikit-learn    # Useful for calculating custom precision/recall metrics or splitting datasets

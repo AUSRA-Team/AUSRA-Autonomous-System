@@ -1,0 +1,39 @@
+# ---------------------------------------------------
+# Python & Virtual Environments
+# ---------------------------------------------------
+yolo_env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ---------------------------------------------------
+# Machine Learning Weights & Models
+# ---------------------------------------------------
+weights/
+*.pt
+*.onnx
+*.engine
+
+# ---------------------------------------------------
+# Datasets & Ultralytics Auto-generations
+# ---------------------------------------------------
+data/
+datasets/
+sample_data/
+runs/
+yolov8*.pt  # Ignores any default YOLO models Ultralytics auto-downloads
+
+# ---------------------------------------------------
+# VS Code & OS Files
+# ---------------------------------------------------
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ---------------------------------------------------
+# ROS 2 Workspaces (Just in case you build locally)
+# ---------------------------------------------------
+build/
+install/
+log/
