@@ -1,7 +1,7 @@
 # ---------------------------------------------------
 # Python & Virtual Environments
 # ---------------------------------------------------
-yolo_env/
+perception_env/
 __pycache__/
 *.py[cod]
 *$py.class
