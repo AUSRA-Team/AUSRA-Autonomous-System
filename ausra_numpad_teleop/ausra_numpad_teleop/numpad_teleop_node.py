@@ -6,60 +6,48 @@ from geometry_msgs.msg import Twist
 import sys
 import termios
 import tty
-import math
 import select
+from rclpy.qos import QoSProfile, ReliabilityPolicy
 
 msg = """
-AUSRA Numpad & Arrow Teleop
+AUSRA Latched Teleop
 ---------------------------
-Moving around (Numpad):
-   7    8    9
-   4    5    6
-   1    2    3
+8 : Forward          2 : Backward
+4 : Left             6 : Right
+7 : Forward-Left     9 : Forward-Right
+1 : Backward-Left    3 : Backward-Right
 
-8 : Forward
-2 : Backward
-4 : Left
-6 : Right
-7 : Forward-Left
-9 : Forward-Right
-1 : Backward-Left
-3 : Backward-Right
+Arrows: Left/Right to Rotate
 
-Arrows:
-Left  : Rotate Clockwise (0.5 rad/s)
-Right : Rotate Anti-clockwise (0.5 rad/s)
+5 or 0 : STOP (Emergency)
 
-0 : Do nothing (Stop)
-5 : Stop
-
-anything else : Stop
-
+[LATCHED MODE: Press once to start, press 5 to stop]
 CTRL-C to quit
 """
 
+# Directions: (x, y, angular_z)
 move_bindings = {
-    '8': (1.0, 0.0, 0.0),   # Forward
-    '2': (-1.0, 0.0, 0.0),  # Backward
-    '4': (0.0, 1.0, 0.0),   # Left
-    '6': (0.0, -1.0, 0.0),  # Right
-    '7': (0.707, 0.707, 0.0),   # Forward-Left
-    '9': (0.707, -0.707, 0.0),  # Forward-Right
-    '1': (-0.707, 0.707, 0.0),  # Backward-Left
-    '3': (-0.707, -0.707, 0.0), # Backward-Right
-    '0': (0.0, 0.0, 0.0),       # Do nothing (Stop)
-    '5': (0.0, 0.0, 0.0),       # Stop
-    '\x1b[D': (0.0, 0.0, -1.0), # Left Arrow: Clockwise
-    '\x1b[C': (0.0, 0.0, 1.0),  # Right Arrow: Anti-clockwise
+    '8': (1.0, 0.0, 0.0),
+    '2': (-1.0, 0.0, 0.0),
+    '4': (0.0, 1.0, 0.0),
+    '6': (0.0, -1.0, 0.0),
+    '7': (0.707, 0.707, 0.0),
+    '9': (0.707, -0.707, 0.0),
+    '1': (-0.707, 0.707, 0.0),
+    '3': (-0.707, -0.707, 0.0),
+    '\x1b[D': (0.0, 0.0, 1.0),  # Left Arrow
+    '\x1b[C': (0.0, 0.0, -1.0), # Right Arrow
 }
+
+stop_bindings = ['5', '0']
 
 def get_key(settings):
     tty.setraw(sys.stdin.fileno())
-    # Wait for up to 0.1s for input
-    rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
+    # Very fast check (10ms)
+    rlist, _, _ = select.select([sys.stdin], [], [], 0.01)
     if rlist:
         key = sys.stdin.read(1)
-        if key == '\x1b': # Escape sequence (Arrows)
+        if key == '\x1b':
             key += sys.stdin.read(2)
     else:
         key = ''
@@ -70,32 +58,50 @@ class NumpadTeleop(Node):
     def __init__(self):
         super().__init__('numpad_teleop')
         
+        qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            depth=10
+        )
+
         self.declare_parameter('robot_name', '')
         robot_name = self.get_parameter('robot_name').value
-        
-        if robot_name:
-            topic = f'/{robot_name}/cmd_vel'
-        else:
-            topic = '/cmd_vel'
+        topic = f'/{robot_name}/cmd_vel' if robot_name else '/cmd_vel'
             
-        self.publisher_ = self.create_publisher(Twist, topic, 10)
-        self.get_logger().info(f'Numpad Teleop initialized. Publishing to {topic}')
+        self.publisher_ = self.create_publisher(Twist, topic, qos_profile)
         
-        self.linear_speed = 0.2  # m/s
-        self.angular_speed = 0.5 # rad/s
+        # PERSISTENT STATE
+        self.target_x = 0.0
+        self.target_y = 0.0
+        self.target_th = 0.0
+        
+        # Speeds
+        self.linear_speed = 0.4 
+        self.angular_speed = 1.0
 
-    def publish_twist(self, x, y, z):
+        # High-frequency timer (50Hz) for instant response
+        self.timer = self.create_timer(0.02, self.publish_callback)
+        self.get_logger().info(f'Latched Teleop active. Publishing to {topic} at 50Hz')
+
+    def set_command(self, x, y, th):
+        self.target_x = x * self.linear_speed
+        self.target_y = y * self.linear_speed
+        self.target_th = th * self.angular_speed
+
+    def stop_robot(self):
+        self.target_x = 0.0
+        self.target_y = 0.0
+        self.target_th = 0.0
+
+    def publish_callback(self):
+        # Continuously sends the CURRENT state
         twist = Twist()
-        twist.linear.x = x * self.linear_speed
-        twist.linear.y = y * self.linear_speed
-        twist.angular.z = z * self.angular_speed
+        twist.linear.x = self.target_x
+        twist.linear.y = self.target_y
+        twist.angular.z = self.target_th
         self.publisher_.publish(twist)
 
 def main(args=None):
     if not sys.stdin.isatty():
-        print("Error: Numpad Teleop node must be run in a terminal (TTY) to capture keyboard input.")
-        print("If you are using 'ros2 launch', try running it directly instead:")
-        print("ros2 run ausra_numpad_teleop numpad_teleop --ros-args -p robot_name:=ausrabot")
         return
 
     settings = termios.tcgetattr(sys.stdin)
@@ -104,21 +110,24 @@ def main(args=None):
 
     try:
         print(msg)
-        while True:
+        while rclpy.ok():
             key = get_key(settings)
-            if key in move_bindings.keys():
-                x, y, z = move_bindings[key]
-                node.publish_twist(x, y, z)
+            
+            if key in move_bindings:
+                x, y, th = move_bindings[key]
+                node.set_command(x, y, th)
+            elif key in stop_bindings:
+                node.stop_robot()
             elif key == '\x03': # CTRL-C
                 break
-            else:
-                node.publish_twist(0.0, 0.0, 0.0)
+            
+            rclpy.spin_once(node, timeout_sec=0)
                 
     except Exception as e:
         print(e)
-
     finally:
-        node.publish_twist(0.0, 0.0, 0.0)
+        node.stop_robot()
+        node.publish_callback()
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
         node.destroy_node()
         rclpy.shutdown()
