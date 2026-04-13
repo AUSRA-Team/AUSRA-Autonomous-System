@@ -26,6 +26,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'fleet_comm_node = ausra_spawner.fleet_comm_node:main',
         ],
     },
 )

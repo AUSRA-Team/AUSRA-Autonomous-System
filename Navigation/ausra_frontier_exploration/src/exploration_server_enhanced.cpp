@@ -20,6 +20,7 @@
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_srvs/srv/empty.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 #include "slam_toolbox/srv/serialize_pose_graph.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
@@ -42,7 +43,8 @@ enum class ExplorationState
   NAVIGATING_TO_FRONTIER,
   RETURNING_HOME,
   WAITING_AT_HOME,
-  COMPLETED
+  COMPLETED,
+  PAUSED
 };
 
 class ExplorationServerEnhanced : public rclcpp::Node
@@ -109,8 +111,9 @@ public:
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
     // Subscribers
+    auto map_qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
     map_sub_ = create_subscription<nav_msgs::msg::OccupancyGrid>(
-      get_parameter("map_topic").as_string(), 10,
+      get_parameter("map_topic").as_string(), map_qos,
       std::bind(&ExplorationServerEnhanced::mapCallback, this, std::placeholders::_1));
 
     // Publishers
@@ -133,6 +136,11 @@ public:
     // Service client for map saving (slam_toolbox)
     save_map_client_ = create_client<slam_toolbox::srv::SerializePoseGraph>("slam_toolbox/serialize_map");
 
+    // Service server for autonomy toggle (Auto / Manual Mode)
+    toggle_service_ = create_service<std_srvs::srv::SetBool>(
+      "toggle_exploration",
+      std::bind(&ExplorationServerEnhanced::toggleCallback, this, std::placeholders::_1, std::placeholders::_2));
+
     RCLCPP_INFO(get_logger(), "Exploration server initialized");
     RCLCPP_INFO(get_logger(), "Start position: (%.2f, %.2f, %.2f)", start_x_, start_y_, start_yaw_);
     RCLCPP_INFO(get_logger(), "Coverage threshold: %.1f%%", coverage_threshold_ * 100.0);
@@ -145,6 +153,41 @@ public:
   }
 
 private:
+  void toggleCallback(
+    const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+    std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+  {
+    if (request->data) {
+      // Enable (Auto)
+      if (state_ == ExplorationState::PAUSED) {
+        state_ = ExplorationState::EXPLORING;
+        publishStatus("EXPLORING");
+        RCLCPP_INFO(get_logger(), "Exploration RESUMED (Auto Mode)");
+        response->success = true;
+        response->message = "Exploration resumed";
+      } else {
+        response->success = false;
+        response->message = "Already exploring or not paused";
+      }
+    } else {
+      // Disable (PAUSE / Manual)
+      if (state_ != ExplorationState::PAUSED && state_ != ExplorationState::COMPLETED) {
+        if (nav_client_) {
+          nav_client_->async_cancel_all_goals();
+        }
+        stopRobot();
+        state_ = ExplorationState::PAUSED;
+        publishStatus("PAUSED_MANUAL_OVERRIDE");
+        RCLCPP_WARN(get_logger(), "Exploration PAUSED for Manual Override");
+        response->success = true;
+        response->message = "Exploration paused";
+      } else {
+        response->success = false;
+        response->message = "Already paused or completed";
+      }
+    }
+  }
+
   void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
   {
     latest_map_ = msg;
@@ -206,6 +249,10 @@ private:
         
       case ExplorationState::COMPLETED:
         // Done, just idle
+        break;
+        
+      case ExplorationState::PAUSED:
+        // Manual override mode active, waiting for RESUME
         break;
     }
   }
@@ -814,6 +861,7 @@ private:
   rclcpp_action::Client<NavigateToPose>::SharedPtr nav_client_;
   rclcpp::TimerBase::SharedPtr exploration_timer_;
   rclcpp::Client<slam_toolbox::srv::SerializePoseGraph>::SharedPtr save_map_client_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr toggle_service_;
 
   ExplorationState state_;
   double current_coverage_{0.0};

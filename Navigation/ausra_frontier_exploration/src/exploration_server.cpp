@@ -264,7 +264,7 @@ private:
   double coverage_threshold_;
   double blacklist_timeout_;
   std::set<std::pair<double, double>> blacklist_;
-  rclcpp::Time last_blacklist_clear_;
+  rclcpp::Time last_blacklist_clear_{0, 0, RCL_ROS_TIME};
   Frontier current_frontier_;
 };
 

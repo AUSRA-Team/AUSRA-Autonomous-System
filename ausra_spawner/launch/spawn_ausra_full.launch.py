@@ -33,6 +33,8 @@ from launch.actions import (
     OpaqueFunction,
     IncludeLaunchDescription,
     GroupAction,
+    LogInfo,
+    ExecuteProcess,
 )
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
@@ -127,39 +129,6 @@ def generate_slam_config(robot_name: str, base_config_path: str) -> str:
     
     config_dir = tempfile.mkdtemp(prefix='ausra_slam_')
     config_path = os.path.join(config_dir, f'{robot_name}_slam.yaml')
-    with open(config_path, 'w') as f:
-        f.write(content)
-    
-    return config_path
-
-
-def generate_nav2_config(robot_name: str, base_config_path: str) -> str:
-    """Generate Nav2 config with robot-specific frame names and topics.
-    
-    Replaces all <robot_namespace> placeholders with the actual robot name
-    and wraps all content under the robot namespace as root key for RewrittenYaml.
-    """
-    with open(base_config_path, 'r') as f:
-        content = f.read()
-    
-    # Replace all <robot_namespace> placeholders with actual robot name
-    content = content.replace('<robot_namespace>', robot_name)
-    
-    # Wrap all content under robot namespace as root key
-    # This is required for RewrittenYaml with root_key=namespace to work properly
-    lines = content.split('\n')
-    indented_lines = []
-    indented_lines.append(f'{robot_name}:')
-    for line in lines:
-        if line.strip():  # Non-empty line
-            indented_lines.append('  ' + line)
-        else:
-            indented_lines.append(line)
-    
-    content = '\n'.join(indented_lines)
-    
-    config_dir = tempfile.mkdtemp(prefix='ausra_nav2_')
-    config_path = os.path.join(config_dir, f'{robot_name}_nav2.yaml')
     with open(config_path, 'w') as f:
         f.write(content)
     
@@ -311,8 +280,12 @@ def generate_full_stack(context, *args, **kwargs):
     )
     
     # ============== OPTIONAL STACKS ==============
+    # Separated into stages: early_nodes (EKF+SLAM) start first,
+    # then nav2_nodes start after a delay so the 'map' TF frame exists.
     
-    optional_nodes = []
+    early_nodes = []   # EKF + SLAM — need to run first
+    nav2_nodes = []    # Nav2 — needs 'map' frame from SLAM
+    exploration_nodes = []  # Exploration — needs Nav2 fully active
     
     # EKF Localization
     if use_ekf:
@@ -340,61 +313,192 @@ def generate_full_stack(context, *args, **kwargs):
                     ('odometry/filtered', 'filtered_odometry'),
                 ]
             )
-            optional_nodes.append(ekf_node)
-    
-    # SLAM Toolbox
-    if use_slam:
-        slam_toolbox_dir = get_package_share_directory('slam_toolbox')
-        pkg_ausra_spawner = get_package_share_directory('ausra_spawner')
-        slam_base_config = os.path.join(pkg_ausra_spawner, 'config', 'slam_multirobot.yaml')
-        if os.path.exists(slam_base_config):
-            slam_config = generate_slam_config(robot_name, slam_base_config)
-        else:
-            # Fallback to slam_explorer config
-            try:
-                pkg_slam = get_package_share_directory('slam_explorer')
-                slam_config = os.path.join(pkg_slam, 'config', 'slam_omni_single_robot.yaml')
-            except Exception:
-                RCLCPP_ERROR("Could not find SLAM config")
-                slam_config = None
-        
-        if slam_config:
-            slam_launch = IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    os.path.join(slam_toolbox_dir, 'launch', 'online_async_launch.py')
-                ),
-                launch_arguments={
-                    'use_sim_time': 'true',
-                    'slam_params_file': slam_config
-                }.items()
-            )
+            early_nodes.append(ekf_node)
             
-            # Wrap SLAM in namespace group
-            slam_group = GroupAction([
-                PushRosNamespace(robot_name),
-                slam_launch
-            ])
-            optional_nodes.append(slam_group)
-    
-    # Nav2
-    if use_nav2 and pkg_nav2_bringup:
-        nav2_base_params = os.path.join(pkg_nav2_bringup, 'params', 'nav2_ausra_multirobot.yaml')
-        
-        # Generate robot-specific nav2 config with namespace placeholders replaced
-        nav2_params_file = generate_nav2_config(robot_name, nav2_base_params)
-        
-        nav2_launch = IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(pkg_nav2_bringup, 'launch', 'navigation_launch.py')
-            ),
-            launch_arguments={
-                'use_sim_time': 'true',
-                'params_file': nav2_params_file,
-                'namespace': robot_name,
-                'autostart': 'true',
-            }.items()
+        # VERY IMPORTANT: Map isolation for proper multi-robot fleet merging
+        # SLAM Toolbox forces base_link to (0,0,0) in its map frame.
+        # By giving each robot its own map frame (e.g., ausra_1_map), and hooking it to the global 'map' 
+        # using the physics spawn coordinates, we maintain perfect true-world coordinate alignment!
+        map_offset_node = Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='map_offset_publisher',
+            namespace=robot_name,
+            arguments=[
+                x, y, '0.0', yaw, '0.0', '0.0',  # x y z yaw pitch roll
+                'map', f'{robot_name}_map'
+            ],
+            output='screen'
         )
-        optional_nodes.append(nav2_launch)
+        early_nodes.append(map_offset_node)
+    
+    # SLAM Toolbox — Direct Node launch with RewrittenYaml
+    if use_slam:
+        pkg_ausra_spawner = get_package_share_directory('ausra_spawner')
+        slam_config_base = os.path.join(pkg_ausra_spawner, 'config', 'slam_multirobot.yaml')
+        
+        slam_rewritten = RewrittenYaml(
+            source_file=slam_config_base,
+            param_rewrites={
+                '<robot_namespace>': robot_name,
+            },
+            namespace=robot_name,
+            convert_types=True
+        )
+        slam_config = slam_rewritten.perform(context)
+        
+        slam_node = Node(
+            package='slam_toolbox',
+            executable='async_slam_toolbox_node',
+            name='slam_toolbox',
+            namespace=robot_name,
+            output='screen',
+            parameters=[slam_config],
+            remappings=[
+                ('/tf', '/tf'),
+                ('/tf_static', '/tf_static'),
+            ]
+        )
+        early_nodes.append(slam_node)
+    
+    # Nav2 Navigation Stack
+    if use_nav2:
+        pkg_ausra_spawner = get_package_share_directory('ausra_spawner')
+        nav2_config_base = os.path.join(pkg_ausra_spawner, 'config', 'nav2_multirobot.yaml')
+        
+        # Create RewrittenYaml with namespace support and execute it to get the config file path
+        # This replaces <robot_namespace> placeholders and prefixes node keys with the namespace
+        nav2_rewritten = RewrittenYaml(
+            source_file=nav2_config_base,
+            param_rewrites={
+                '<robot_namespace>': robot_name,
+            },
+            namespace=robot_name,
+            convert_types=True
+        )
+        nav2_config = nav2_rewritten.perform(context)
+        
+        # Nav2 Lifecycle Manager
+        lifecycle_nodes = [
+            'controller_server',
+            'planner_server',
+            'behavior_server',
+            'bt_navigator',
+            'waypoint_follower',
+            'velocity_smoother',
+        ]
+        
+        nav2_lifecycle_manager = Node(
+            package='nav2_lifecycle_manager',
+            executable='lifecycle_manager',
+            name='lifecycle_manager_navigation',
+            namespace=robot_name,
+            output='screen',
+            parameters=[{
+                'use_sim_time': True,
+                'autostart': True,
+                'node_names': lifecycle_nodes,
+                'bond_timeout': 10.0,
+                'attempt_respawn_reconnection': True,
+                'bond_respawn_max_duration': 10.0,
+            }]
+        )
+        
+        # Controller Server
+        controller_server = Node(
+            package='nav2_controller',
+            executable='controller_server',
+            name='controller_server',
+            namespace=robot_name,
+            output='screen',
+            parameters=[nav2_config],
+            remappings=[
+                ('/tf', '/tf'),
+                ('/tf_static', '/tf_static'),
+            ]
+        )
+        
+        # Planner Server
+        planner_server = Node(
+            package='nav2_planner',
+            executable='planner_server',
+            name='planner_server',
+            namespace=robot_name,
+            output='screen',
+            parameters=[nav2_config],
+            remappings=[
+                ('/tf', '/tf'),
+                ('/tf_static', '/tf_static'),
+            ]
+        )
+        
+        # Behavior Server
+        behavior_server = Node(
+            package='nav2_behaviors',
+            executable='behavior_server',
+            name='behavior_server',
+            namespace=robot_name,
+            output='screen',
+            parameters=[nav2_config],
+            remappings=[
+                ('/tf', '/tf'),
+                ('/tf_static', '/tf_static'),
+            ]
+        )
+        
+        # BT Navigator
+        bt_navigator = Node(
+            package='nav2_bt_navigator',
+            executable='bt_navigator',
+            name='bt_navigator',
+            namespace=robot_name,
+            output='screen',
+            parameters=[nav2_config],
+            remappings=[
+                ('/tf', '/tf'),
+                ('/tf_static', '/tf_static'),
+            ]
+        )
+        
+        # Waypoint Follower
+        waypoint_follower = Node(
+            package='nav2_waypoint_follower',
+            executable='waypoint_follower',
+            name='waypoint_follower',
+            namespace=robot_name,
+            output='screen',
+            parameters=[nav2_config],
+            remappings=[
+                ('/tf', '/tf'),
+                ('/tf_static', '/tf_static'),
+            ]
+        )
+        
+        # Velocity Smoother
+        velocity_smoother = Node(
+            package='nav2_velocity_smoother',
+            executable='velocity_smoother',
+            name='velocity_smoother',
+            namespace=robot_name,
+            output='screen',
+            parameters=[nav2_config],
+            remappings=[
+                ('/tf', '/tf'),
+                ('/tf_static', '/tf_static'),
+                ('cmd_vel', 'cmd_vel_nav'),
+                ('cmd_vel_smoothed', 'cmd_vel'),
+            ]
+        )
+        
+        nav2_nodes.extend([
+            controller_server,
+            planner_server,
+            behavior_server,
+            bt_navigator,
+            waypoint_follower,
+            velocity_smoother,
+            nav2_lifecycle_manager,
+        ])
     
     # Frontier Exploration
     if use_exploration and pkg_exploration:
@@ -407,8 +511,8 @@ def generate_full_stack(context, *args, **kwargs):
         exploration_params = {
             'use_sim_time': True,
             'robot_base_frame': f'{robot_name}_robot_footprint',
-            'global_frame': 'map',
-            'map_topic': f'/{robot_name}/map',  # Subscribe to SLAM map
+            'global_frame': f'{robot_name}_map',
+            'map_topic': 'map',  # Subscribe to isolated SLAM map
             'start_x': float(x),
             'start_y': float(y),
             'start_yaw': float(yaw),
@@ -428,15 +532,21 @@ def generate_full_stack(context, *args, **kwargs):
         
         exploration_node = Node(
             package='ausra_frontier_exploration',
-            executable='exploration_server',
+            executable='exploration_server_enhanced',
             name='exploration_server',
             namespace=robot_name,
             output='screen',
             parameters=[exploration_params]
         )
-        optional_nodes.append(exploration_node)
+        exploration_nodes.append(exploration_node)
     
     # ============== EVENT CHAIN ==============
+    # Staged launch order:
+    #   1. RSP → Spawn → JSB → JGVC → OmniDriver
+    #   2. After JGVC (+5s):  EKF + SLAM start
+    #   3. After JGVC (+10s): Nudge — small movement so SLAM populates the map
+    #   4. After JGVC (+15s): Nav2 starts (needs 'map' TF from SLAM)
+    #   5. After JGVC (+30s): Exploration starts (needs Nav2 fully active)
     
     delayed_spawn = TimerAction(
         period=2.0,
@@ -474,22 +584,6 @@ def generate_full_stack(context, *args, **kwargs):
         )
     )
     
-    # Start optional stacks after driver is ready
-    if optional_nodes:
-        load_optional_after_driver = RegisterEventHandler(
-            event_handler=OnProcessExit(
-                target_action=joint_group_velocity_controller,
-                on_exit=[
-                    TimerAction(
-                        period=5.0,  # Give driver time to stabilize
-                        actions=optional_nodes
-                    )
-                ]
-            )
-        )
-    else:
-        load_optional_after_driver = None
-    
     actions = [
         robot_state_publisher,
         delayed_spawn,
@@ -498,8 +592,85 @@ def generate_full_stack(context, *args, **kwargs):
         load_driver_after_jgvc
     ]
     
-    if load_optional_after_driver:
-        actions.append(load_optional_after_driver)
+    # Stage 1: Start EKF + SLAM early (5s after controllers)
+    if early_nodes:
+        load_early_after_driver = RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=joint_group_velocity_controller,
+                on_exit=[
+                    TimerAction(
+                        period=5.0,  # Give driver time to stabilize
+                        actions=early_nodes
+                    )
+                ]
+            )
+        )
+        actions.append(load_early_after_driver)
+    
+    # Stage 2: Nudge the robot slightly so SLAM can register initial scans
+    # SLAM needs the robot to move to populate the map and publish the 'map' TF
+    if use_slam:
+        nudge_cmd = ExecuteProcess(
+            cmd=['bash', '-c',
+                 f'ros2 topic pub --once /{robot_name}/cmd_vel geometry_msgs/msg/Twist '
+                 f'"{{linear: {{x: 0.1, y: 0.0, z: 0.0}}, angular: {{x: 0.0, y: 0.0, z: 0.3}}}}" '
+                 f'&& sleep 2 '
+                 f'&& ros2 topic pub --once /{robot_name}/cmd_vel geometry_msgs/msg/Twist '
+                 f'"{{linear: {{x: 0.0, y: 0.0, z: 0.0}}, angular: {{x: 0.0, y: 0.0, z: 0.0}}}}"'
+            ],
+            output='screen'
+        )
+        load_nudge = RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=joint_group_velocity_controller,
+                on_exit=[
+                    TimerAction(
+                        period=35.0,  # 5s after exploration starts
+                        actions=[
+                            LogInfo(msg='>>> Nudging robot to seed SLAM map...'),
+                            nudge_cmd,
+                        ]
+                    )
+                ]
+            )
+        )
+        actions.append(load_nudge)
+    
+    # Stage 2: Start Nav2 (15s after controllers)
+    # This gives SLAM ~10s to receive scans and publish the 'map' TF frame
+    if nav2_nodes:
+        load_nav2_after_slam = RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=joint_group_velocity_controller,
+                on_exit=[
+                    TimerAction(
+                        period=15.0,  # 10s after SLAM starts
+                        actions=[
+                            LogInfo(msg='>>> Starting Nav2 navigation stack...'),
+                        ] + nav2_nodes
+                    )
+                ]
+            )
+        )
+        actions.append(load_nav2_after_slam)
+    
+    # Stage 3: Start Exploration (30s after controllers)
+    # This gives Nav2 ~15s to fully configure and activate all lifecycle nodes
+    if exploration_nodes:
+        load_exploration_after_nav2 = RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=joint_group_velocity_controller,
+                on_exit=[
+                    TimerAction(
+                        period=30.0,  # 15s after Nav2 starts
+                        actions=[
+                            LogInfo(msg='>>> Starting frontier exploration...'),
+                        ] + exploration_nodes
+                    )
+                ]
+            )
+        )
+        actions.append(load_exploration_after_nav2)
     
     return actions
 

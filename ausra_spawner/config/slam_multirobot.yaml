@@ -24,12 +24,12 @@ slam_toolbox:
     # --------------------------------------------------------------------------
     # CRITICAL: These frames must match the robot's TF tree
     odom_frame: <robot_namespace>_odom
-    map_frame: map
+    map_frame: <robot_namespace>_map
     base_frame: <robot_namespace>_robot_footprint
     scan_topic: scan
     
-    # Map publishing - publishes to namespaced topic (e.g., /ausra_1/map)
-    map_topic: map
+    # Map publishing - publishes to namespaced topic (e.g., /ausra_1/slam_map_internal)
+    map_topic: slam_map_internal
     map_name: map
     use_map_saver: true
     
