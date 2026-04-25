@@ -24,6 +24,8 @@ sample_data/
 runs/
 results/
 predictions/
+depthai-python/
+tools/
 yolov8*.pt  # Ignores any default YOLO models Ultralytics auto-downloads
 
 # ---------------------------------------------------
