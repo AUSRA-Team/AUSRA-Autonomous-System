@@ -1,0 +1,7 @@
+train: /kaggle/input/victims-non-victims/train/images
+val: /kaggle/input/victims-non-victims/valid/images
+test: /kaggle/input/victims-non-victims/test/images
+
+nc: 2
+
+names: ['Non-Victims', 'Victims']
