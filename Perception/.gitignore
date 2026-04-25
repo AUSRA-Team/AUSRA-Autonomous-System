@@ -22,6 +22,8 @@ data/
 datasets/
 sample_data/
 runs/
+results/
+predictions/
 yolov8*.pt  # Ignores any default YOLO models Ultralytics auto-downloads
 
 # ---------------------------------------------------
