@@ -59,7 +59,7 @@ class NumpadTeleop(Node):
         super().__init__('numpad_teleop')
         
         qos_profile = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            reliability=ReliabilityPolicy.RELIABLE,
             depth=10
         )
 
