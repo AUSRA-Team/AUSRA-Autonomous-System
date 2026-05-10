@@ -1,0 +1,13 @@
+explore_node:
+  ros__parameters:
+    robot_base_frame: ausrabot_robot_footprint
+    costmap_topic: /global_costmap/costmap
+    costmap_updates_topic: /global_costmap/costmap_updates
+    visualize: true
+    planner_frequency: 0.35             # 0.5 → 0.35 (~3 sec cycles; allows smoother navigation between frontiers)
+    progress_timeout: 50.0              # 60 → 50 (more responsive to stuck situations in cluttered spaces)
+    potential_scale: 2.8                # 3.0 → 2.8 (balanced frontier attraction; less jumpy transitions)
+    orientation_scale: 0.0
+    gain_scale: 1.4                     # 1.2 → 1.4 (prefer expanding mapped area; better coverage in cluttered rooms)
+    transform_tolerance: 0.5
+    min_frontier_size: 0.35             # 0.5 → 0.35 (detect smaller frontiers; prevents missing narrow passages)

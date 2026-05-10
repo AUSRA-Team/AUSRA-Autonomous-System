@@ -1,65 +1,122 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, GroupAction, LogInfo
+from launch.actions import IncludeLaunchDescription, RegisterEventHandler, TimerAction, DeclareLaunchArgument, GroupAction
 from launch_ros.actions import Node, PushRosNamespace
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.event_handlers import OnProcessStart
 from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch_ros.actions import Node
 
 def generate_launch_description():
-    # 1. Get package directories
-    pkg_exploration = get_package_share_directory('ausra_frontier_exploration')
-    pkg_lidar_slam = get_package_share_directory('lidar_slam_pkg')
-    nav2_bringup_dir = get_package_share_directory('nav2_bringup')
+    pkg_dir = get_package_share_directory('ausra_frontier_exploration')
+    slam_explorer_dir = get_package_share_directory('slam_explorer')
+    localization_dir = get_package_share_directory('ausra_localization')
     slam_toolbox_dir = get_package_share_directory('slam_toolbox')
+    nav2_bringup_dir = get_package_share_directory('nav2_bringup')
+    ausra_spawner_dir = get_package_share_directory('ausra_spawner')
     
-    # 2. Config paths
-    nav2_params_file = os.path.join(pkg_lidar_slam, 'config', 'nav2_params.yaml')
-    slam_params_file = os.path.join(pkg_lidar_slam, 'config', 'slam_toolbox_config.yaml')
+    # Use unified Nav2 params from ausra_spawner (single source of truth)
+    nav2_params_file = os.path.join(ausra_spawner_dir, 'config', 'nav2_params.yaml')
     
-    # 3. Launch Configurations
-    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
-    namespace = LaunchConfiguration('namespace', default='')
+    # Params
+    slam_params_file = os.path.join(slam_explorer_dir, 'config', 'slam_omni_single_robot.yaml')
+    ekf_params = os.path.join(localization_dir, 'config', 'ekf.yaml')
+    imu_params = os.path.join(localization_dir, 'config', 'imu_complimentary_filter.yaml')
 
-    # 4. Robot Drivers + SLAM (Core System)
-    # This starts motors, lidar, and slam_toolbox
-    core_system_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(pkg_lidar_slam, 'launch', 'slam.launch.py'))
+    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
+
+    # SLAM Toolbox
+    slam_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(slam_toolbox_dir, 'launch', 'online_async_launch.py')),
+        launch_arguments={
+            'use_sim_time': use_sim_time,
+            'slam_params_file': slam_params_file
+        }.items()
     )
 
-    # 5. Nav2 Stack
+    # Nav2 Bringup (using MY new params)
     nav2_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(nav2_bringup_dir, 'launch', 'navigation_launch.py')),
         launch_arguments={
             'use_sim_time': use_sim_time,
-            'params_file': nav2_params_file,
-            'use_composition': 'True',
+            'params_file': nav2_params_file
         }.items()
     )
 
-    # 6. Exploration Server
-    exploration_server = Node(
-        package='ausra_frontier_exploration',
-        executable='exploration_server',
-        name='exploration_server',
-        output='screen',
-        parameters=[
-            nav2_params_file, 
-            {
+
+
+    namespace = LaunchConfiguration('namespace')
+    
+    # Namespaced group
+    exploration_group = GroupAction([
+        PushRosNamespace(namespace),
+        
+        # IMU Filter
+        Node(
+            package='imu_complementary_filter',
+            executable='complementary_filter_node',
+            name='complementary_filter_gain_node',
+            output='screen',
+            parameters=[imu_params, {'use_sim_time': use_sim_time}],
+            remappings=[('imu/data', 'imu/data_filtered')]
+        ),
+
+        # EKF
+        Node(
+            package='robot_localization',
+            executable='ekf_node',
+            name='ekf_filter_node',
+            output='screen',
+            parameters=[ekf_params, {'use_sim_time': use_sim_time}],
+            remappings=[('odometry/filtered', 'filtered_odometry')],
+        ),
+        
+        # SLAM Toolbox (Must be carefully namespaced or strictly isolated in configs)
+        # Note: SLAM Toolbox often needs specific config tweaks for multi-robot map topics
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(os.path.join(slam_toolbox_dir, 'launch', 'online_async_launch.py')),
+            launch_arguments={
                 'use_sim_time': use_sim_time,
-                # Ensure frame matches your hardware setup (ausrabot_robot_footprint)
-                'robot_base_frame': 'ausrabot_robot_footprint'
-            }
-        ],
-    )
+                'slam_params_file': slam_params_file
+            }.items()
+        ),
+
+        # Nav2 Bringup
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(os.path.join(nav2_bringup_dir, 'launch', 'navigation_launch.py')),
+            launch_arguments={
+                'use_sim_time': use_sim_time,
+                'params_file': nav2_params_file,
+                'use_namespace': 'true',
+                'namespace': namespace
+            }.items()
+        ),
+
+        # Exploration Node
+        Node(
+            package='ausra_frontier_exploration',
+            executable='exploration_server',
+            name='exploration_server',
+            output='screen',
+            parameters=[
+                nav2_params_file, 
+                {
+                    'use_sim_time': use_sim_time,
+                    'robot_base_frame': PythonExpression(["'", namespace, "/base_link' if '", namespace, "' != '' else 'base_link'"])
+                }
+            ],
+        ),
+    ])
 
     return LaunchDescription([
-        DeclareLaunchArgument('use_sim_time', default_value='false'),
-        DeclareLaunchArgument('namespace', default_value=''),
-        
-        LogInfo(msg='Starting Integrated Autonomous Exploration (Mapping + Navigation)'),
-        
-        core_system_launch,
-        nav2_launch,
-        exploration_server
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='true',
+            description='Use simulation clock'),
+        DeclareLaunchArgument(
+            'namespace',
+            default_value='',
+            description='Top-level namespace'),
+            
+        exploration_group
     ])

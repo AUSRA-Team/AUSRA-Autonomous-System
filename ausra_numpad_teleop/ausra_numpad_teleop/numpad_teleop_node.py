@@ -75,7 +75,7 @@ class NumpadTeleop(Node):
         self.target_th = 0.0
         
         # Speeds
-        self.linear_speed = 0.4 
+        self.linear_speed = 0.2 
         self.angular_speed = 1.0
 
         # High-frequency timer (50Hz) for instant response
