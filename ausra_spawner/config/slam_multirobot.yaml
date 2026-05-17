@@ -41,16 +41,16 @@ slam_toolbox:
     # --------------------------------------------------------------------------
     use_sim_time: true
     debug_logging: false
-    throttle_scans: 1                     # Process every scan for better accuracy
+    throttle_scans: 3                     # Process every scan for better accuracy  # was 1 
     transform_publish_period: 0.02        # 50Hz TF publishing for smooth transforms
-    map_update_interval: 0.5              # Faster map updates
+    map_update_interval: 0.2              # Faster map updates # was 0.5
     resolution: 0.05
     restamp_tf: true                      # ENABLED - helps TF timing (from slam_explorer)
-    max_laser_range: 12.0                 # Use FULL laser range
-    min_laser_range: 0.12                 # Allow closer readings
+    max_laser_range: 10.0                 # Use FULL laser range  # was 12.0
+    min_laser_range: 0.2                  # Allow closer readings # was 0.12
     minimum_time_interval: 0.05           # Faster processing
-    transform_timeout: 0.3                # Tighter timeout for fresher TF
-    tf_buffer_duration: 10.0              # Smaller buffer = less memory
+    transform_timeout: 0.2                # Tighter timeout for fresher TF # was 0.3
+    tf_buffer_duration: 30.0              # Smaller buffer = less memory # was 10.0
     stack_size_to_use: 40000000
     enable_interactive_mode: true         # ENABLED - allows runtime adjustments
 
@@ -59,13 +59,13 @@ slam_toolbox:
     # --------------------------------------------------------------------------
     use_scan_matching: true
     use_scan_barycenter: true
-    minimum_travel_distance: 0.05         # Very small movement triggers update
-    minimum_travel_heading: 0.08          # Small rotation before update (~4.5 deg)
-    check_min_dist_and_heading_precisely: true  # Precise checks
-    scan_buffer_size: 20                  # Larger buffer for better matching (from slam_explorer)
-    scan_buffer_maximum_scan_distance: 12.0  # FULL laser range (12m sensor)
-    link_match_minimum_response_fine: 0.9    # VERY high confidence required
-    link_scan_maximum_distance: 0.3          # Very tight constraint
+    minimum_travel_distance: 0.15         # Very small movement triggers update # was 0.05
+    minimum_travel_heading: 0.25          # Small rotation before update (~4.5 deg) # was 0.08
+    check_min_dist_and_heading_precisely: false  # Precise checks # was true
+    scan_buffer_size: 20                  # Larger buffer for better matching (from slam_explorer) # was 20
+    scan_buffer_maximum_scan_distance: 9.0  # FULL laser range (12m sensor) # was 12.0
+    link_match_minimum_response_fine: 0.6    # VERY high confidence required # was 0.9
+    link_scan_maximum_distance: 0.8          # Very tight constraint # was 0.3
 
     # --------------------------------------------------------------------------
     # Loop Closing Settings - CONSERVATIVE from slam_explorer
@@ -73,18 +73,18 @@ slam_toolbox:
     # Loop closing enabled with very strict thresholds to prevent false loops
     # This allows gradual map correction while avoiding sudden jumps
     do_loop_closing: true                    # ENABLED with conservative params
-    loop_search_maximum_distance: 2.0        # Only close very local loops
-    loop_match_minimum_chain_size: 30        # Need more evidence
-    loop_match_maximum_variance_coarse: 0.15 # Stricter matching (from slam_explorer)
-    loop_match_minimum_response_coarse: 0.75 # Higher confidence required
-    loop_match_minimum_response_fine: 0.85   # Very high confidence for fine match
+    loop_search_maximum_distance: 10.0        # Only close very local loops # was 2.0
+    loop_match_minimum_chain_size: 15        # Need more evidence # was 30
+    loop_match_maximum_variance_coarse: 0.8 # Stricter matching (from slam_explorer) # was 0.15
+    loop_match_minimum_response_coarse: 0.5 # Higher confidence required # was 0.75
+    loop_match_minimum_response_fine: 0.5   # Very high confidence for fine match # was 0.85
 
     # --------------------------------------------------------------------------
     # Correlation Parameters (TUNED for tight matching and less drift)
     # --------------------------------------------------------------------------
-    correlation_search_space_dimension: 0.3   # Smaller search = tighter matching
-    correlation_search_space_resolution: 0.003  # Very fine resolution
-    correlation_search_space_smear_deviation: 0.005  # Less smear = sharper
+    correlation_search_space_dimension: 0.5   # Smaller search = tighter matching # was 0.3
+    correlation_search_space_resolution: 0.01  # Very fine resolution # was 0.003
+    correlation_search_space_smear_deviation: 0.008  # Less smear = sharper # was 0.005
 
     # --------------------------------------------------------------------------
     # Loop Search Parameters
@@ -96,13 +96,13 @@ slam_toolbox:
     # --------------------------------------------------------------------------
     # Penalty Parameters (from reference)
     # --------------------------------------------------------------------------
-    distance_variance_penalty: 0.5
-    angle_variance_penalty: 0.3
-    fine_search_angle_offset: 0.0005
-    coarse_search_angle_offset: 0.2
-    coarse_angle_resolution: 0.0349
-    minimum_angle_penalty: 0.2
-    minimum_distance_penalty: 0.1
-    use_response_expansion: true
-    min_pass_through: 20
-    occupancy_threshold: 0.3              # Added from reference
+    distance_variance_penalty: 0.8      # was 0.5
+    angle_variance_penalty: 0.3         # was 0.3
+    fine_search_angle_offset: 0.0005    # was 0.0005
+    coarse_search_angle_offset: 0.2     # was 0.2
+    coarse_angle_resolution: 0.0349     # was 0.0349
+    minimum_angle_penalty: 0.2          # was 0.2
+    minimum_distance_penalty: 0.1       # was 0.1
+    use_response_expansion: true        # was true
+    min_pass_through: 8                 # was 20
+    occupancy_threshold: 0.33           # Added from reference # was 0.3

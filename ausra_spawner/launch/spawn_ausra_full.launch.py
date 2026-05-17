@@ -311,6 +311,9 @@ def generate_full_stack(context, *args, **kwargs):
                 parameters=[ekf_config, {'use_sim_time': True}],
                 remappings=[
                     ('odometry/filtered', 'filtered_odometry'),
+                    ('/tf', '/tf'),
+                    ('/tf_static', '/tf_static'),
+
                 ]
             )
             early_nodes.append(ekf_node)

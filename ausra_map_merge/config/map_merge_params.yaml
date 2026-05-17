@@ -1,0 +1,44 @@
+# ============================================================================
+# map_merge_params.yaml
+# Parameters for the central multirobot_map_merge node.
+#
+# IMPORTANT: All init_pose values are 0.0 because global alignment is handled
+# by the map_expansion_node (via robot_offset_x/y). The map_merge node acts
+# as a pure pixel overlay — no shifting, no resizing.
+#
+# The parameter names follow the ROS1-style slash convention used internally
+# by the map_merge node's ros1_names::append() helper.
+# ============================================================================
+
+map_merge:
+  ros__parameters:
+    robot_map_topic: map_fixed
+    robot_namespace: "ausra_"
+    merged_map_topic: /map_merged
+    world_frame: map
+    known_init_poses: true
+    merging_rate: 1.0
+    discovery_rate: 0.05
+    estimation_rate: 0.5
+    estimation_confidence: 1.0
+
+    # ── Per-Robot Init Poses ─────────────────────────────────────────────
+    # ALL values are 0.0 because the map_expansion_node pre-aligns each
+    # robot's canvas to global pixel positions using robot_offset_x/y.
+    # Do NOT set non-zero values here — it would double-shift the maps.
+
+    /ausra_1/map_merge/init_pose_x: 0.0
+    /ausra_1/map_merge/init_pose_y: 0.0
+    /ausra_1/map_merge/init_pose_z: 0.0
+    /ausra_1/map_merge/init_pose_yaw: 0.0
+
+    /ausra_2/map_merge/init_pose_x: 0.0
+    /ausra_2/map_merge/init_pose_y: 0.0
+    /ausra_2/map_merge/init_pose_z: 0.0
+    /ausra_2/map_merge/init_pose_yaw: 0.0
+
+    # Add more robots here (always 0.0 — offsets go in map_merge.launch.py):
+    # /ausra_3/map_merge/init_pose_x: 0.0
+    # /ausra_3/map_merge/init_pose_y: 0.0
+    # /ausra_3/map_merge/init_pose_z: 0.0
+    # /ausra_3/map_merge/init_pose_yaw: 0.0
