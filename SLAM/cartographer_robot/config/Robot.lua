@@ -104,6 +104,8 @@ TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.rotation_delta_cost_wei
 TRAJECTORY_BUILDER_2D.ceres_scan_matcher.occupied_space_weight = 20. --  good at 20 test  to enable lidar trust more
 TRAJECTORY_BUILDER_2D.ceres_scan_matcher.translation_weight = 10.  --can decrease to trust lidar more  increase to 
 TRAJECTORY_BUILDER_2D.ceres_scan_matcher.rotation_weight = 40.    -- test trust lidar more in rotation orginal was 40. make it 4e2
+TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.probability_grid_range_data_inserter.miss_probability = 0.49
+TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.probability_grid_range_data_inserter.hit_probability = 0.65
 
 --used if there is lag can decrease it -- 
 -- TRAJECTORY_BUILDER_2D.ceres_scan_matcher.ceres_solver_options.use_nonmonotonic_steps = false
