@@ -12,7 +12,7 @@ def generate_full_hardware_stack(context):
     # 1. Get package directories
     pkg_lidar_slam = get_package_share_directory('lidar_slam_pkg')
     pkg_localization = get_package_share_directory('ausra_localization')
-    pkg_exploration = get_package_share_directory('ausra_frontier_exploration')
+    # pkg_exploration = get_package_share_directory('ausra_frontier_exploration')
     pkg_nav2_bringup = get_package_share_directory('nav2_bringup')
     pkg_description = get_package_share_directory('ausrabot_description')
     pkg_lidar = get_package_share_directory('sllidar_ros2')
@@ -23,7 +23,7 @@ def generate_full_hardware_stack(context):
     slam_config_file = os.path.join(pkg_lidar_slam, 'config', 'slam_toolbox_config.yaml')
     hardware_params = os.path.join(pkg_description, 'config', 'hardware_params.yaml')
     xacro_file = os.path.join(pkg_description, 'urdf', 'robot.urdf.xacro')
-    explore_params_file = os.path.join(pkg_exploration, 'config', 'explore_params.yaml')
+    explore_params_file = os.path.join(pkg_lidar_slam, 'config', 'explore_params.yaml')
     
     # 3. Launch Configurations
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
@@ -123,7 +123,7 @@ def generate_full_hardware_stack(context):
         package='explore_lite',
         name='explore_node',
         executable='explore',
-        parameters=[explore_params_file, {'use_sim_time': True}],
+        parameters=[explore_params_file, {'use_sim_time': False}],
         output='screen',
     )
 
