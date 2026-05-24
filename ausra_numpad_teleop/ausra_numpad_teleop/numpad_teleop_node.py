@@ -64,8 +64,8 @@ class NumpadTeleop(Node):
         )
 
         self.declare_parameter('robot_name', '')
-        robot_name = self.get_parameter('robot_name').value
-        topic = f'/{robot_name}/cmd_vel' if robot_name else '/cmd_vel'
+        # Use a RELATIVE topic — PushRosNamespace handles the /<robot_name>/ prefix.
+        topic = 'cmd_vel'
             
         self.publisher_ = self.create_publisher(Twist, topic, qos_profile)
         

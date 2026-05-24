@@ -6,21 +6,26 @@ complementary_filter_gain_node:
     do_bias_estimation: true
     do_adaptive_gain: true
     use_mag: false
+    # NOTE: fixed_frame is overridden at launch time with the prefixed
+    # odom frame (e.g., ausra_1_odom).  This default is a safe fallback.
     fixed_frame: "ausrabot_odom"
     publish_tf: false
     reverse_tf: false
     constant_dt: 0.0
     publish_debug_topics: false
 
+    # QoS overrides — keys MUST be relative so PushRosNamespace applies.
+    # Previously these were /imu/data_raw and /imu/mag (absolute), which
+    # would bypass the namespace entirely.
     qos_overrides:
-      /imu/data_raw:
+      imu/data_raw:
         subscription:
           depth: 10
           durability: volatile
           history: keep_last
           reliability: reliable
 
-      /imu/mag:
+      imu/mag:
         subscription:
           depth: 10
           durability: volatile

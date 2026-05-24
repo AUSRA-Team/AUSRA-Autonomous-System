@@ -10,7 +10,7 @@ bt_navigator:
     use_sim_time: false
     global_frame: map
     robot_base_frame: ausrabot_robot_footprint
-    odom_topic: /filtered_odometry
+    odom_topic: filtered_odometry
     bt_loop_duration: 10
     default_server_timeout: 20
     wait_for_service_timeout: 1000
@@ -191,7 +191,7 @@ global_costmap:
           obstacle_min_range: 0.2
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
-        map_topic: /map
+        map_topic: map
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
@@ -262,7 +262,7 @@ velocity_smoother:
     min_velocity: [-0.2, -0.2, -0.2]
     max_accel: [1.8, 1.8, 1.8]         # REDUCED: 2.5 → 1.8 (smoother acceleration profiles)
     max_decel: [-1.8, -1.8, -1.8]      # REDUCED: -2.5 → -1.8
-    odom_topic: "/filtered_odometry"
+    odom_topic: "filtered_odometry"
     odom_duration: 0.15
     deadband_velocity: [0.01, 0.01, 0.01]
     velocity_timeout: 5.0

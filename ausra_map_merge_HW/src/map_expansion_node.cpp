@@ -9,7 +9,7 @@
 //   multirobot_map_merge can consume without crashing or misaligning.
 //
 // HARDWARE ADAPTATION NOTES:
-//   - Default input_topic is "/map" (hardware SLAM runs in global namespace).
+//   - Default input_topic is "map" (relative; namespaced at launch time).
 //   - Default output_topic is "/ausra_1/map_fixed".
 //   - robot_offset_x/y represent physical tape-measured spawn offsets, not
 //     Gazebo spawn coordinates.
@@ -113,9 +113,9 @@ public:
     frame_id_("map")         // safe default; overwritten on first SLAM message
   {
     // ── Parameter declarations ──────────────────────────────────────────────
-    // HARDWARE DEFAULT: input_topic is "/map" (global namespace SLAM output)
-    this->declare_parameter<std::string>("input_topic",      "/map");
-    this->declare_parameter<std::string>("output_topic",     "/ausra_1/map_fixed");
+    // HARDWARE DEFAULT: input_topic is "map" (relative, namespaced at launch)
+    this->declare_parameter<std::string>("input_topic",      "map");
+    this->declare_parameter<std::string>("output_topic",     "map_fixed");
     this->declare_parameter<int>   ("canvas_width",           1000);
     this->declare_parameter<int>   ("canvas_height",          1000);
     this->declare_parameter<double>("canvas_resolution",      0.05);

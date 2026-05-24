@@ -64,7 +64,7 @@ def generate_launch_description():
             'use_sim_time': False,
             'odom_frame': 'ausrabot_odom',
             'base_frame': 'ausrabot_robot_footprint',
-            'scan_topic': '/scan'
+            'scan_topic': 'scan'
             }
         ]
     )

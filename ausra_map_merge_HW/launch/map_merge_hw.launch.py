@@ -1,28 +1,23 @@
 """
 map_merge_hw.launch.py
-AUSRA Hardware Map Merge — Incremental Test Launch File
+AUSRA Hardware Map Merge — Multi-Robot Networked Deployment
 
-HARDWARE ADAPTATION NOTES (vs simulation version):
-  - Input topic:  /map  (not /ausra_1/map)
-    Hardware SLAM (async_slam_toolbox_node) runs in the GLOBAL namespace with
-    NO robot prefix. It publishes to /map, not a namespaced topic.
-  - Frame IDs:    map, ausrabot_odom, ausrabot_robot_footprint
-    These are the real hardware TF frames from hardware_full_stack.launch.py.
-  - No Gazebo:    spawn coordinates come from tape-measure SOP, not Gazebo args.
-  - Phantom robot: A second expansion node with a non-existent input topic is
-    always launched. Its subscriber never fires; it just heartbeats all-Unknown.
-    This prevents multirobot_map_merge from segfaulting with only one real map
-    (the composeGrids pipeline requires at least two valid arrays at init time).
+MULTI-ROBOT NOTES:
+  - Each robot's hardware_full_stack.launch.py must be launched inside a
+    namespace (e.g., /ausra_1, /ausra_2) so that SLAM publishes to
+    /<robot_name>/map instead of the global /map.
+  - The ROBOT_HW_CONFIG dictionary below maps each robot to its
+    tape-measured physical spawn offset.
+  - The SLAM input topic is derived automatically:  /<robot_name>/map
+  - The expansion output topic follows the pattern: /<robot_name>/map_fixed
+  - No phantom node is needed when 2+ real robots are present.
 
-PHASE SWITCHING:
-  To switch between Phase 1 and Phase 2, edit only the ROBOT_HW_CONFIG block
-  at the top of this file. All other code stays unchanged.
-
-  Phase 1 — Robot at physical origin:
-    'ausra_1': {'offset_x': 0.0, 'offset_y': 0.0}
-
-  Phase 2 — Robot translated to (X=2.0, Y=0.0):
-    'ausra_1': {'offset_x': 2.0, 'offset_y': 0.0}
+SCALING:
+  To add a new robot:
+    1. Add an entry to ROBOT_HW_CONFIG below.
+    2. Add a matching init_pose block (all 0.0) in map_merge_HW_params.yaml.
+    3. Launch the new robot's hardware stack inside its namespace.
+    4. Relaunch this file.
 """
 
 import os
@@ -33,46 +28,29 @@ from ament_index_python.packages import get_package_share_directory
 
 
 # ==============================================================================
-# ── EDIT THIS BLOCK ONLY ──────────────────────────────────────────────────────
+# ── ROBOT FLEET CONFIGURATION ─────────────────────────────────────────────────
 #
-# PHASE 1 — Robot placed exactly at the physical origin mark.
-# Expected RViz result: merged map appears centred around the canvas origin.
+# One entry per physical robot. Offsets come from the tape-measure SOP.
+# The SLAM input topic is derived automatically as /<robot_name>/map.
 #
-#   'ausra_1': {'offset_x': 0.0, 'offset_y': 0.0}
-#
-# PHASE 2 — Robot physically moved to X=2.0m, Y=0.0m from origin.
-# Expected RViz result: the map content shifts 2.0m in the +X direction.
-# All walls and features appear 2.0m further right vs Phase 1.
-# The canvas origin stays fixed at (-25.0, -25.0) — only content moves.
-#
-#   'ausra_1': {'offset_x': 2.0, 'offset_y': 0.0}
-#
-# For hardware deployment (SOP): fill values from tape measurements.
+# IMPORTANT: Each robot's hardware_full_stack.launch.py must be launched
+# inside the corresponding namespace (e.g., --ros-args -r __ns:=/ausra_1).
 # ==============================================================================
 
 ROBOT_HW_CONFIG = {
     'ausra_1': {
-        'offset_x': 1.0,   # ← CHANGE THIS for Phase 2 / real deployment
-        'offset_y': 0.15,   # ← CHANGE THIS for real deployment
+        'offset_x': 1.0,     # Robot 1 at physical origin
+        'offset_y': 0.0,
     },
-}
-
-# ==============================================================================
-# ── HARDWARE TOPIC MAPPING ────────────────────────────────────────────────────
-# The hardware SLAM (async_slam_toolbox_node) runs in the global namespace.
-# It publishes to /map — NOT to a namespaced /ausra_1/map topic.
-# This dict maps each robot name to its real hardware SLAM topic.
-# For a single-robot test, ausra_1 uses /map.
-# For future multi-robot: each robot's SLAM must be remapped to its own topic
-# (e.g., via namespace in hardware_full_stack.launch.py).
-# ==============================================================================
-
-ROBOT_SLAM_TOPICS = {
-    'ausra_1': '/map',             # Real hardware SLAM output
-    # Phantom robot: topic does not exist on hardware.
-    # Subscriber never fires. Heartbeat publishes all-Unknown canvas.
-    # This prevents composeGrids from crashing with only one real map.
-    'ausra_2_phantom': '/map_phantom_never_published',
+    'ausra_2': {
+        'offset_x': 1.0,    # Measured: 3.45 m along +X from origin
+        'offset_y': 0.15,     # Measured: 0.0 m along Y
+    },
+    # ── Add more robots here ──────────────────────────────────────────────
+    # 'ausra_3': {
+    #     'offset_x': 1.20,
+    #     'offset_y': 2.80,
+    # },
 }
 
 # Canvas parameters — must match map_merge_HW_params.yaml
@@ -92,22 +70,24 @@ def generate_launch_description():
     pkg_share = get_package_share_directory('ausra_map_merge_HW')
     params_file = os.path.join(pkg_share, 'config', 'map_merge_HW_params.yaml')
 
+    robot_count = len(ROBOT_HW_CONFIG)
+
     # ── Startup log ────────────────────────────────────────────────────────────
     ld.add_action(LogInfo(msg=(
         '\n'
         '╔══════════════════════════════════════════════════════════════╗\n'
-        '║         AUSRA Hardware Map Merge — Baseline Test             ║\n'
+        '║      AUSRA Hardware Map Merge — Multi-Robot Deployment       ║\n'
         '╠══════════════════════════════════════════════════════════════╣\n'
-        '║ INPUT:  /map (hardware SLAM — global namespace)              ║\n'
+       f'║ ROBOTS: {robot_count} configured                                        ║\n'
+        '║ INPUT:  /<robot_name>/map (namespaced SLAM)                  ║\n'
         '║ OUTPUT: /map_merged                                          ║\n'
         '║ CANVAS: 1000×1000 @ 0.05 m/cell | Origin (-25.0, -25.0)     ║\n'
-        '║ PHANTOM ROBOT: ausra_2_phantom provides dummy canvas         ║\n'
         '╚══════════════════════════════════════════════════════════════╝\n'
     )))
 
     # ── Print active robot offsets ─────────────────────────────────────────────
     for robot_name, cfg in ROBOT_HW_CONFIG.items():
-        slam_topic = ROBOT_SLAM_TOPICS.get(robot_name, '/map')
+        slam_topic = f'/{robot_name}/map'
         ld.add_action(LogInfo(msg=(
             f'[AUSRA HW] {robot_name}: '
             f'SLAM topic={slam_topic} | '
@@ -115,13 +95,14 @@ def generate_launch_description():
         )))
 
     ld.add_action(LogInfo(msg=(
-        '[AUSRA HW] Confirm robot is at tape-marked position with correct yaw.\n'
-        '[AUSRA HW] init_pose_* in map_merge_HW_params.yaml must be 0.0.\n'
+        '[AUSRA HW] Confirm all robots are at tape-marked positions with correct yaw.\n'
+        '[AUSRA HW] init_pose_* in map_merge_HW_params.yaml must be 0.0 for ALL robots.\n'
     )))
 
     # ── Map Expansion Nodes (one per real robot) ───────────────────────────────
     for robot_name, cfg in ROBOT_HW_CONFIG.items():
-        slam_topic = ROBOT_SLAM_TOPICS.get(robot_name, '/map')
+        # SLAM topic derived automatically from robot name
+        slam_topic   = f'/{robot_name}/map'
         output_topic = f'/{robot_name}/{MAP_FIXED_SUFFIX}'
 
         expansion_node = Node(
@@ -130,70 +111,24 @@ def generate_launch_description():
             name=f'map_expansion_{robot_name}',
             namespace='',
             parameters=[{
-                # ── Hardware-specific: input is global /map, not namespaced ──
                 'input_topic':        slam_topic,
                 'output_topic':       output_topic,
-
-                # ── Spatial alignment: from tape measurement (SOP Phase 2) ──
-                # Phase 1: both 0.0 (robot at physical origin)
-                # Phase 2: set offset_x/offset_y to measured values
                 'robot_offset_x':     cfg['offset_x'],
                 'robot_offset_y':     cfg['offset_y'],
-
-                # ── Canvas parameters (must match map_merge_HW_params.yaml) ─
                 'canvas_width':       CANVAS_WIDTH,
                 'canvas_height':      CANVAS_HEIGHT,
                 'canvas_resolution':  CANVAS_RESOLUTION,
                 'canvas_origin_x':    CANVAS_ORIGIN_X,
                 'canvas_origin_y':    CANVAS_ORIGIN_Y,
-
-                # ── Heartbeat rate ─────────────────────────────────────────
                 'publish_rate_hz':    1.0,
             }],
             output='screen',
         )
         ld.add_action(expansion_node)
 
-    # ── Phantom Expansion Node ─────────────────────────────────────────────────
-    # This node subscribes to a topic that does not exist on hardware.
-    # Its mapCallback never fires. Its heartbeat timer publishes a valid
-    # 1000×1000 all-Unknown canvas immediately on startup.
-    #
-    # PURPOSE: multirobot_map_merge's composeGrids pipeline requires at least
-    # two valid grids at initialisation time. Without this phantom node, the
-    # merger discovers only one namespace (ausra_1) and crashes attempting an
-    # affine transform against a null second matrix (Trigger B segfault).
-    # With this node, the merger always has two valid arrays and initialises
-    # safely. The phantom canvas is all-Unknown, so it does not pollute the
-    # merged output — it only prevents the crash.
-    #
-    # Remove this node when a second physical robot is added to the fleet.
-    phantom_expansion_node = Node(
-        package='ausra_map_merge_HW',
-        executable='map_expansion_node',
-        name='map_expansion_ausra_2_phantom',
-        namespace='',
-        parameters=[{
-            # This topic does not exist on hardware — subscriber never fires
-            'input_topic':        ROBOT_SLAM_TOPICS['ausra_2_phantom'],
-            'output_topic':       f'/ausra_2/{MAP_FIXED_SUFFIX}',
-            'robot_offset_x':     0.0,
-            'robot_offset_y':     0.0,
-            'canvas_width':       CANVAS_WIDTH,
-            'canvas_height':      CANVAS_HEIGHT,
-            'canvas_resolution':  CANVAS_RESOLUTION,
-            'canvas_origin_x':    CANVAS_ORIGIN_X,
-            'canvas_origin_y':    CANVAS_ORIGIN_Y,
-            'publish_rate_hz':    1.0,
-        }],
-        output='screen',
-    )
-    ld.add_action(phantom_expansion_node)
-
     # ── Central Map Merge Node ─────────────────────────────────────────────────
-    # Small delay allows the heartbeat canvases to be published at least once
-    # before the merger begins its discovery scan. At 1 Hz heartbeat, 2 seconds
-    # guarantees at least one valid publish from both expansion nodes.
+    # 2-second delay allows heartbeat canvases to publish at least once before
+    # the merger begins its discovery scan.
     map_merge_node = TimerAction(
         period=2.0,
         actions=[

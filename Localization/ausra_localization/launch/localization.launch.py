@@ -30,7 +30,7 @@ def generate_launch_description():
         name='complementary_filter_gain_node',
         output='screen',
         parameters=[imu_params, {'use_sim_time': use_sim_time}],
-        remappings=[('/imu','/imu/data_filtered')]
+        remappings=[('/imu','imu/data_filtered')]
     )
 
     # Robot Localization (EKF)
@@ -40,7 +40,7 @@ def generate_launch_description():
         name='ekf_filter_node',
         output='screen',
         parameters=[ekf_params, {'use_sim_time': use_sim_time}],
-        remappings=[('/odometry/filtered', '/filtered_odometry')],
+        remappings=[('odometry/filtered', 'filtered_odometry')],
     )
     
     # Laser Filter (Optional, commented out in original but good to have ready)

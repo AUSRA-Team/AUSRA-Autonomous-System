@@ -57,15 +57,15 @@ class HolonomicMovementDemo(Node):
         self.declare_parameter('robot_name', '')
         robot_name = self.get_parameter('robot_name').value
         
-        # Construct topic names based on robot_name
+        # Construct topic names — use RELATIVE topics so PushRosNamespace
+        # applies the namespace automatically.  Do NOT prefix with '/'.
         if robot_name:
-            cmd_vel_topic = f'/{robot_name}/cmd_vel'
-            odom_topic = f'/{robot_name}/odom'
             self.get_logger().info(f'Targeting robot: {robot_name}')
         else:
-            cmd_vel_topic = '/cmd_vel'
-            odom_topic = '/odom'
-            self.get_logger().info('No robot_name specified, using global topics')
+            self.get_logger().info('No robot_name specified, using default namespace topics')
+
+        cmd_vel_topic = 'cmd_vel'
+        odom_topic = 'odom'
 
         # Parameters
         self.declare_parameter('linear_velocity', 0.2)  # m/s
