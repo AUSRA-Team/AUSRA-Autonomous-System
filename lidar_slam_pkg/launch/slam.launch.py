@@ -62,8 +62,8 @@ def generate_launch_description():
             config_slam, 
             {
             'use_sim_time': False,
-            'odom_frame': 'ausrabot_odom',
-            'base_frame': 'ausrabot_robot_footprint',
+            'odom_frame': LaunchConfiguration('odom_frame', default='odom'),
+            'base_frame': LaunchConfiguration('base_frame', default='base_link'),
             'scan_topic': 'scan'
             }
         ]
@@ -80,6 +80,8 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('use_rviz', default_value='false'),
         DeclareLaunchArgument('serial_port', default_value='/dev/ttyUSB0'),
+        DeclareLaunchArgument('odom_frame', default_value='odom', description='Odometry frame ID'),
+        DeclareLaunchArgument('base_frame', default_value='base_link', description='Robot base frame ID'),
         robot_state_publisher,
         omni_driver,
         lidar_driver,

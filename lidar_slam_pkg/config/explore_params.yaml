@@ -1,4 +1,4 @@
-explore_node:
+/**:
   ros__parameters:
     robot_base_frame: ausrabot_robot_footprint
     costmap_topic: global_costmap/costmap

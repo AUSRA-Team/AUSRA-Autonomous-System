@@ -30,7 +30,7 @@ def generate_launch_description():
         name='complementary_filter_gain_node',
         output='screen',
         parameters=[imu_params, {'use_sim_time': use_sim_time}],
-        remappings=[('/imu','imu/data_filtered')]
+        remappings=[('imu','imu/data_filtered')]
     )
 
     # Robot Localization (EKF)
