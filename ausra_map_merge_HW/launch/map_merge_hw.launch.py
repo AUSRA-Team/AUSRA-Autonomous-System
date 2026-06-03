@@ -6,52 +6,25 @@ MULTI-ROBOT NOTES:
   - Each robot's hardware_full_stack.launch.py must be launched inside a
     namespace (e.g., /ausra_1, /ausra_2) so that SLAM publishes to
     /<robot_name>/map instead of the global /map.
-  - The ROBOT_HW_CONFIG dictionary below maps each robot to its
-    tape-measured physical spawn offset.
+  - The map expansion node takes the tape-measured physical spawn offsets
+    to expand and shift the map before merging.
   - The SLAM input topic is derived automatically:  /<robot_name>/map
   - The expansion output topic follows the pattern: /<robot_name>/map_fixed
-  - No phantom node is needed when 2+ real robots are present.
 
-SCALING:
-  To add a new robot:
-    1. Add an entry to ROBOT_HW_CONFIG below.
-    2. Add a matching init_pose block (all 0.0) in map_merge_HW_params.yaml.
-    3. Launch the new robot's hardware stack inside its namespace.
-    4. Relaunch this file.
+SCALING VIA COMMAND LINE:
+  You can now pass your robots and their X/Y offsets directly from the terminal!
+  Format: "robot_name:offset_x:offset_y robot_name:offset_x:offset_y"
+
+  Example:
+  ros2 launch ausra_map_merge_HW map_merge_hw.launch.py robot_config:="alpha:1.0:0.0 beta:3.45:0.15"
 """
 
 import os
 from launch import LaunchDescription
-from launch.actions import LogInfo, TimerAction
+from launch.actions import LogInfo, TimerAction, DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
-
-
-# ==============================================================================
-# ── ROBOT FLEET CONFIGURATION ─────────────────────────────────────────────────
-#
-# One entry per physical robot. Offsets come from the tape-measure SOP.
-# The SLAM input topic is derived automatically as /<robot_name>/map.
-#
-# IMPORTANT: Each robot's hardware_full_stack.launch.py must be launched
-# inside the corresponding namespace (e.g., --ros-args -r __ns:=/ausra_1).
-# ==============================================================================
-
-ROBOT_HW_CONFIG = {
-    'ausra_1': {
-        'offset_x': 1.0,     # Robot 1 at physical origin
-        'offset_y': 0.0,
-    },
-    'ausra_2': {
-        'offset_x': 1.0,    # Measured: 3.45 m along +X from origin
-        'offset_y': 0.15,     # Measured: 0.0 m along Y
-    },
-    # ── Add more robots here ──────────────────────────────────────────────
-    # 'ausra_3': {
-    #     'offset_x': 1.20,
-    #     'offset_y': 2.80,
-    # },
-}
 
 # Canvas parameters — must match map_merge_HW_params.yaml
 CANVAS_WIDTH      = 1000
@@ -63,17 +36,32 @@ CANVAS_ORIGIN_Y   = -25.0
 # Output topic suffix that multirobot_map_merge will subscribe to
 MAP_FIXED_SUFFIX = 'map_fixed'
 
-
-def generate_launch_description():
-    ld = LaunchDescription()
-
+def launch_setup(context, *args, **kwargs):
+    actions = []
     pkg_share = get_package_share_directory('ausra_map_merge_HW')
     params_file = os.path.join(pkg_share, 'config', 'map_merge_HW_params.yaml')
 
-    robot_count = len(ROBOT_HW_CONFIG)
+    # ── Parse Robot Config String ─────────────────────────────────────────────
+    robot_config_str = LaunchConfiguration('robot_config').perform(context)
+    robot_hw_config = {}
+    
+    if robot_config_str.strip():
+        # Example format: "ausra_1:1.0:0.0 ausra_2:1.0:0.15"
+        robot_entries = robot_config_str.split()
+        for entry in robot_entries:
+            try:
+                name, x_str, y_str = entry.split(':')
+                robot_hw_config[name] = {
+                    'offset_x': float(x_str),
+                    'offset_y': float(y_str)
+                }
+            except ValueError:
+                actions.append(LogInfo(msg=f'[ERROR] Invalid robot config format: {entry}. Expected name:x:y'))
+
+    robot_count = len(robot_hw_config)
 
     # ── Startup log ────────────────────────────────────────────────────────────
-    ld.add_action(LogInfo(msg=(
+    actions.append(LogInfo(msg=(
         '\n'
         '╔══════════════════════════════════════════════════════════════╗\n'
         '║      AUSRA Hardware Map Merge — Multi-Robot Deployment       ║\n'
@@ -86,22 +74,21 @@ def generate_launch_description():
     )))
 
     # ── Print active robot offsets ─────────────────────────────────────────────
-    for robot_name, cfg in ROBOT_HW_CONFIG.items():
+    for robot_name, cfg in robot_hw_config.items():
         slam_topic = f'/{robot_name}/map'
-        ld.add_action(LogInfo(msg=(
+        actions.append(LogInfo(msg=(
             f'[AUSRA HW] {robot_name}: '
             f'SLAM topic={slam_topic} | '
             f'offset=({cfg["offset_x"]:.3f}, {cfg["offset_y"]:.3f})'
         )))
 
-    ld.add_action(LogInfo(msg=(
+    actions.append(LogInfo(msg=(
         '[AUSRA HW] Confirm all robots are at tape-marked positions with correct yaw.\n'
-        '[AUSRA HW] init_pose_* in map_merge_HW_params.yaml must be 0.0 for ALL robots.\n'
+        '[AUSRA HW] init_pose_* dynamically set to 0.0 for all robots.\n'
     )))
 
     # ── Map Expansion Nodes (one per real robot) ───────────────────────────────
-    for robot_name, cfg in ROBOT_HW_CONFIG.items():
-        # SLAM topic derived automatically from robot name
+    for robot_name, cfg in robot_hw_config.items():
         slam_topic   = f'/{robot_name}/map'
         output_topic = f'/{robot_name}/{MAP_FIXED_SUFFIX}'
 
@@ -124,9 +111,17 @@ def generate_launch_description():
             }],
             output='screen',
         )
-        ld.add_action(expansion_node)
+        actions.append(expansion_node)
 
     # ── Central Map Merge Node ─────────────────────────────────────────────────
+    # Dynamically build init_pose parameters for all parsed robots
+    dynamic_init_poses = {}
+    for robot_name in robot_hw_config.keys():
+        dynamic_init_poses[f'/{robot_name}/map_merge/init_pose_x'] = 0.0
+        dynamic_init_poses[f'/{robot_name}/map_merge/init_pose_y'] = 0.0
+        dynamic_init_poses[f'/{robot_name}/map_merge/init_pose_z'] = 0.0
+        dynamic_init_poses[f'/{robot_name}/map_merge/init_pose_yaw'] = 0.0
+
     # 2-second delay allows heartbeat canvases to publish at least once before
     # the merger begins its discovery scan.
     map_merge_node = TimerAction(
@@ -138,11 +133,21 @@ def generate_launch_description():
                 executable='map_merge',
                 name='map_merge',
                 namespace='',
-                parameters=[params_file],
+                parameters=[params_file, dynamic_init_poses],
                 output='screen',
             ),
         ]
     )
-    ld.add_action(map_merge_node)
+    actions.append(map_merge_node)
 
-    return ld
+    return actions
+
+def generate_launch_description():
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'robot_config',
+            default_value='ausra_1:1.0:0.0 ausra_2:1.0:0.15',
+            description='Space-separated list of robot configs in the format name:offset_x:offset_y'
+        ),
+        OpaqueFunction(function=launch_setup)
+    ])

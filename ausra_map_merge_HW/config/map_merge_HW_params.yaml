@@ -16,7 +16,7 @@ map_merge:
 
     # ── Topic and namespace discovery ─────────────────────────────────────────
     robot_map_topic:   map_fixed
-    robot_namespace:   ausra_
+    robot_namespace:   ""
 
     # ── Output ────────────────────────────────────────────────────────────────
     merged_map_topic:  /map_merged
@@ -38,15 +38,5 @@ map_merge:
     # ==========================================================================
     # !! INIT POSE VALUES — MUST ALL REMAIN 0.0 !!
     # ==========================================================================
-
-    # Robot 1
-    /ausra_1/map_merge/init_pose_x:   0.0   # DO NOT CHANGE
-    /ausra_1/map_merge/init_pose_y:   0.0   # DO NOT CHANGE
-    /ausra_1/map_merge/init_pose_z:   0.0
-    /ausra_1/map_merge/init_pose_yaw: 0.0
-
-    # Robot 2
-    /ausra_2/map_merge/init_pose_x:   0.0   # DO NOT CHANGE
-    /ausra_2/map_merge/init_pose_y:   0.0   # DO NOT CHANGE
-    /ausra_2/map_merge/init_pose_z:   0.0
-    /ausra_2/map_merge/init_pose_yaw: 0.0
+    # Note: These are now injected dynamically in map_merge_hw.launch.py 
+    # based on the ROBOT_HW_CONFIG dictionary to support any namespace prefix.

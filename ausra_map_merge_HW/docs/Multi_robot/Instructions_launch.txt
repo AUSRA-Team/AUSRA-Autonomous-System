@@ -1,0 +1,17 @@
+ros2 launch lidar_slam_pkg hardware_full_stack.launch.py robot_name:=alpha
+
+ros2 launch lidar_slam_pkg hardware_full_stack.launch.py robot_name:=beta
+
+ros2 launch ausra_map_merge_HW map_merge_hw.launch.py robot_config:="alpha:4.0:0.0 beta:3.45:0.15"
+
+Name: alpha
+X Offset: 4.0
+Y Offset: 0.0
+
+
+
+using dummy
+
+ros2 launch ausra_map_merge_HW dummy_robot.launch.py robot_name:=dummy_beta
+
+ros2 launch ausra_map_merge_HW map_merge_hw.launch.py robot_config:="alpha:4.0:0.0 dummy_beta:0.0:0.0"
