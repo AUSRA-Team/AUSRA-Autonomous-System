@@ -72,6 +72,11 @@ def generate_full_hardware_stack(context):
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     nudge_robot  = LaunchConfiguration('nudge_robot', default='false')
 
+    # Get spawn position
+    x = LaunchConfiguration('x', default='0.0').perform(context)
+    y = LaunchConfiguration('y', default='0.0').perform(context)
+    yaw = LaunchConfiguration('yaw', default='0.0').perform(context)
+
     # ══════════════════════════════════════════════════════════════════════
     # Stage 0: Core Hardware & Description
     # ══════════════════════════════════════════════════════════════════════
@@ -192,6 +197,20 @@ def generate_full_hardware_stack(context):
     #         ('/imu',          'imu'),
     #     ],
     # )
+    map_offset_node = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='map_offset_publisher',
+        arguments=[
+            x, y, '0.0', yaw, '0.0', '0.0',  # x y z yaw pitch roll
+            'map', map_frame,
+        ],
+        remappings=[
+            ('/tf', '/tf'),
+            ('/tf_static', '/tf_static'),
+        ],
+        output='screen'
+    )
 
     # Inline EKF node — inject prefixed frame names and relative topics.
     ekf_node = Node(
@@ -437,6 +456,7 @@ def generate_full_hardware_stack(context):
         omni_driver,
         lidar_driver,
         mpu6050_driver,
+        map_offset_node,
 
         # Stage 1: IMU Filter + EKF + SLAM (5 s delay)
         # Each TimerAction re-pushes the namespace for its children.
@@ -527,6 +547,9 @@ def generate_launch_description():
             'nudge_robot',
             default_value='false',
             description='Automatically nudge the robot to seed SLAM'),
+        DeclareLaunchArgument('x', default_value='0.0', description='X position'),
+        DeclareLaunchArgument('y', default_value='0.0', description='Y position'),
+        DeclareLaunchArgument('yaw', default_value='0.0', description='Yaw angle'),
 
         OpaqueFunction(function=generate_full_hardware_stack)
     ])
