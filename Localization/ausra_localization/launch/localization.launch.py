@@ -42,7 +42,13 @@ def generate_launch_description():
         parameters=[ekf_params, {'use_sim_time': use_sim_time}],
         remappings=[('/odometry/filtered', '/filtered_odometry')],
     )
-    
+    mpu6050_node = Node(
+        package='mpu6050driver',
+        executable='mpu6050driver',
+        name='mpu6050publisher',
+        output='screen',
+        parameters=['/home/ausranano/ausra_ws2/src/ros2_mpu6050_driver/params/mpu6050.yaml'],
+    )
     # Laser Filter (Optional, commented out in original but good to have ready)
     # speckle_filter_node = Node(
     #     package='laser_filters',
@@ -68,5 +74,6 @@ def generate_launch_description():
             
         # imu_filter_node,
         # start_ekf_event
+        mpu6050_node,
         ekf_node
     ])
