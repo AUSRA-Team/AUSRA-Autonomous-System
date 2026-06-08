@@ -1,6 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, GroupAction
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node, PushRosNamespace
 from launch_ros.substitutions import FindPackageShare
 
@@ -22,14 +22,18 @@ def generate_launch_description():
     ])
 
     oak_group = GroupAction([
-        PushRosNamespace(robot_name),   # /ausra_1
+        PushRosNamespace(robot_name),
 
         Node(
             package='depthai_ros_driver',
             executable='camera_node',
-            # name='oak_camera',
-            parameters=[config_file],
             output='screen',
+            parameters=[
+                config_file,
+                # Dynamically set frame_id to match URDF optical frame
+                {'rgb.i_frame_id':    PythonExpression(["'", robot_name, "_camera_link_optical'"])},
+                {'stereo.i_frame_id': PythonExpression(["'", robot_name, "_camera_link_optical'"])},
+            ],
         ),
     ])
 

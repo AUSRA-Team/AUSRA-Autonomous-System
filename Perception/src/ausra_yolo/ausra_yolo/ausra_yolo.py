@@ -375,8 +375,8 @@ class AusraYoloNode(Node):
         """Get current robot position in map frame."""
         try:
             tf = self.tf_buffer.lookup_transform(
-                'map',
-                'base_link',
+                f'{self.robot_name}_map', # ausra_1/map
+                f'{self.robot_name}_base_link', # 'ausra_1_base_link'
                 rclpy.time.Time(),        # latest available
                 RclpyDuration(seconds=0.1)
             )

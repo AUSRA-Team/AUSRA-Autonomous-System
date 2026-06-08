@@ -9,6 +9,7 @@
       i_resolution: "720P"
       i_fps: 30.0
       i_publish_topic: true
+      i_frame_id:"ausra_1_camera_link_optical"
 
     stereo:
       i_align_depth: true             # aligns depth to RGB frame
