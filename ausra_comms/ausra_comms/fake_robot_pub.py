@@ -80,24 +80,8 @@ class FakeRobotPub(Node):
         height = 50
         resolution = 0.05  # 2.5m x 2.5m total area
 
-        data = []
-        random.seed(self.robot_index * 42)  # deterministic per robot
-
-        for y in range(height):
-            for x in range(width):
-                # Outer walls
-                if x == 0 or x == width - 1 or y == 0 or y == height - 1:
-                    data.append(100)
-                # Internal cross structure (different per robot via offset)
-                elif x == width // 2 and y > 10 and y < height - 10:
-                    data.append(100)
-                elif y == height // 2 and x > 10 and x < width - 10:
-                    data.append(100)
-                # Some random obstacles
-                elif random.random() < 0.02:
-                    data.append(100)
-                else:
-                    data.append(0)
+        # Empty map (-1 = unknown space) for testing map merge
+        data = [-1] * (width * height)
 
         grid = OccupancyGrid()
         # frame_id = 'map' — the global frame. map_merge uses init_pose
@@ -107,8 +91,7 @@ class FakeRobotPub(Node):
         grid.info.resolution = resolution
         grid.info.width = width
         grid.info.height = height
-        # Offset each robot's map origin so they overlap partially
-        grid.info.origin.position.x = float(self.robot_index - 1) * 1.0
+        grid.info.origin.position.x = 0.0
         grid.info.origin.position.y = 0.0
         grid.info.origin.orientation.w = 1.0
         grid.data = data

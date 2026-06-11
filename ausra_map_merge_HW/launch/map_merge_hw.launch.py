@@ -67,7 +67,7 @@ def launch_setup(context, *args, **kwargs):
         '║      AUSRA Hardware Map Merge — Multi-Robot Deployment       ║\n'
         '╠══════════════════════════════════════════════════════════════╣\n'
        f'║ ROBOTS: {robot_count} configured                                        ║\n'
-        '║ INPUT:  /<robot_name>/map (namespaced SLAM)                  ║\n'
+        '║ INPUT:  /<robot_name>/map_relay (from relay_node)              ║\n'
         '║ OUTPUT: /map_merged                                          ║\n'
         '║ CANVAS: 1000×1000 @ 0.05 m/cell | Origin (-25.0, -25.0)     ║\n'
         '╚══════════════════════════════════════════════════════════════╝\n'
@@ -75,7 +75,7 @@ def launch_setup(context, *args, **kwargs):
 
     # ── Print active robot offsets ─────────────────────────────────────────────
     for robot_name, cfg in robot_hw_config.items():
-        slam_topic = f'/{robot_name}/map'
+        slam_topic = f'/{robot_name}/map_relay'
         actions.append(LogInfo(msg=(
             f'[AUSRA HW] {robot_name}: '
             f'SLAM topic={slam_topic} | '
@@ -89,7 +89,7 @@ def launch_setup(context, *args, **kwargs):
 
     # ── Map Expansion Nodes (one per real robot) ───────────────────────────────
     for robot_name, cfg in robot_hw_config.items():
-        slam_topic   = f'/{robot_name}/map'
+        slam_topic   = f'/{robot_name}/map_relay'
         output_topic = f'/{robot_name}/{MAP_FIXED_SUFFIX}'
 
         expansion_node = Node(

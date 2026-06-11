@@ -1,11 +1,12 @@
 # ============================================================
 # FILE: setup.py
-# RUNS ON: All machines (Robot 1, Robot 2, Robot 3, Laptop)
-# PURPOSE: ROS2 Python package setup for ausra_comms.
-#          Registers relay_node and fake_robot_pub as console scripts.
-#          Installs launch files and config files.
+# PACKAGE: ausra_comms
+# RUNS ON: Jetson (ausra_1, ausra_2)
+# PURPOSE: Registers relay_node as a console script.
+#          Installs launch files for Jetson hardware + comms.
 #
-# PLACEHOLDERS: None
+# NOTE: This is the JETSON-ONLY package. The base station
+#       package is ausra_comms_base (runs on laptop).
 # ============================================================
 
 import os
@@ -16,7 +17,7 @@ package_name = 'ausra_comms'
 
 setup(
     name=package_name,
-    version='0.1.0',
+    version='0.2.0',
     packages=[package_name],
     data_files=[
         # --- Package index registration ---
@@ -27,23 +28,19 @@ setup(
         # --- Launch files ---
         (os.path.join('share', package_name, 'launch'),
             glob('launch/*.launch.py')),
-        # --- Config files (bridge YAMLs) ---
+        # --- Zenoh bridge config (JSON5) ---
         (os.path.join('share', package_name, 'config'),
-            glob('config/*.yaml')),
-        # --- Shell scripts ---
-        (os.path.join('share', package_name, 'scripts'),
-            glob('scripts/*.sh')),
+            glob('config/*.json5')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='TODO',
     maintainer_email='todo@todo.com',
-    description='Communication layer and launch files for 3-robot swarm Search and Rescue system',
+    description='Jetson relay node for AUSRA swarm — namespaces and throttles SLAM topics for DDS',
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
             'relay_node = ausra_comms.relay_node:main',
-            'fake_robot_pub = ausra_comms.fake_robot_pub:main',
         ],
     },
 )

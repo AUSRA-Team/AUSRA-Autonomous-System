@@ -148,7 +148,7 @@ def generate_full_hardware_stack(context):
     mpu6050_driver = Node(
         package='mpu6050driver',
         executable='mpu6050driver',
-        name='mpu6050driver_node',
+        name='mpu6050publisher',
         output='screen',
         emulate_tty=True,
         parameters=[mpu6050_params_file, {
