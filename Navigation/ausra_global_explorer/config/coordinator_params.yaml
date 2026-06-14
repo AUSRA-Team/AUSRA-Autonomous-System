@@ -1,0 +1,59 @@
+/**:
+  ros__parameters:
+    # ── Robot Configuration ──────────────────────────────────────────────────
+    # Comma-separated list — MUST match the namespaces in spawn_ausra_full.launch.py
+    robot_names: "ausra_1,ausra_2,ausra_3"
+
+    # Use simulation time
+    use_sim_time: true
+
+    # ── Map Source ───────────────────────────────────────────────────────────
+    # Confirmed from ausra_map_merge/config/map_merge_params.yaml: merged_map_topic
+    map_topic: "/map_merged"
+
+    # ── Timing ───────────────────────────────────────────────────────────────
+    # 0.5 Hz = recheck every 2 s (simulation maps update fast, 0.2 Hz is too slow)
+    planning_rate_hz: 0.5
+
+    # ── Frontier Filtering ───────────────────────────────────────────────────
+    # Lower than hardware (smaller sim maps, less noise)
+    min_frontier_cells: 5
+
+    # Radius around a failed goal to blacklist (meters)
+    blacklist_radius_m: 0.5
+
+    # Cancel a stuck robot after this many seconds
+    progress_timeout_s: 30.0
+
+    # OccupancyGrid: cells with value 0–49 are considered free
+    free_threshold: 50
+
+    # Publish /frontier_coordinator/frontiers MarkerArray for RViz2
+    visualize: true
+
+    # ── Anti-loop filters ────────────────────────────────────────────────────
+    # Minimum distance (m) a frontier must be from the robot to be assigned.
+    # Prevents re-assigning spawn-point frontiers that Nav2 "succeeds" instantly.
+    # Increase if robots still loop; decrease if valid close frontiers are skipped.
+    min_frontier_dist_m: 1.5
+
+    # If a goal succeeds in fewer than this many seconds, it was trivial
+    # (robot was already standing on the frontier). The frontier is blacklisted.
+    trivial_goal_s: 5.0
+
+    # ── Robot-Robot Collision Prevention (Options 1+2+3) ─────────────────────
+    # Option 2: minimum distance (m) a frontier must be from any OTHER robot's
+    # live body position. Prevents sending robots directly toward each other.
+    # Reduced to 0.4m to free up movement constraints.
+    min_inter_robot_dist_m: 0.4
+
+    # Option 1: radius (m) of the PointCloud2 obstacle halo published around each
+    # robot by robot_obstacle_publisher. This feeds both costmaps and Collision Monitor.
+    # Reduced to 0.20m so costmaps don't trap the robots at spawn.
+    robot_obstacle_radius_m: 0.20
+
+    # Number of points per ring in the obstacle halo disk (higher = smoother)
+    ring_points: 20
+
+    # Publish rate of the obstacle halo (Hz) — 10Hz is sufficient
+    publish_rate_hz: 10.0

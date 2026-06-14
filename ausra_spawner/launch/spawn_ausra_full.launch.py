@@ -39,7 +39,7 @@ from launch.actions import (
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.substitutions import LaunchConfiguration, PythonExpression, TextSubstitution
 from launch_ros.actions import Node, PushRosNamespace
 from nav2_common.launch import RewrittenYaml
 
@@ -160,6 +160,9 @@ def generate_full_stack(context, *args, **kwargs):
     use_slam = LaunchConfiguration('use_slam').perform(context).lower() == 'true'
     use_nav2 = LaunchConfiguration('use_nav2').perform(context).lower() == 'true'
     use_exploration = LaunchConfiguration('use_exploration').perform(context).lower() == 'true'
+    # When use_global_coordinator=true the central frontier_coordinator node
+    # (ausra_global_explorer) assigns goals — per-robot exploration is skipped.
+    use_global_coordinator = LaunchConfiguration('use_global_coordinator').perform(context).lower() == 'true'
     
     # Get package directories
     pkg_ausrabot_description = get_package_share_directory('ausrabot_description')
@@ -376,7 +379,7 @@ def generate_full_stack(context, *args, **kwargs):
             param_rewrites={
                 '<robot_namespace>': robot_name,
             },
-            namespace=robot_name,
+            namespace=TextSubstitution(text=robot_name),
             convert_types=True
         )
         nav2_config = nav2_rewritten.perform(context)
@@ -389,6 +392,7 @@ def generate_full_stack(context, *args, **kwargs):
             'bt_navigator',
             'waypoint_follower',
             'velocity_smoother',
+            'collision_monitor',
         ]
         
         nav2_lifecycle_manager = Node(
@@ -401,9 +405,9 @@ def generate_full_stack(context, *args, **kwargs):
                 'use_sim_time': True,
                 'autostart': True,
                 'node_names': lifecycle_nodes,
-                'bond_timeout': 10.0,
+                'bond_timeout': 30.0,              # was 10.0 — 3-robot Gazebo load causes >10s lags
                 'attempt_respawn_reconnection': True,
-                'bond_respawn_max_duration': 10.0,
+                'bond_respawn_max_duration': 30.0,  # was 10.0
             }]
         )
         
@@ -478,6 +482,8 @@ def generate_full_stack(context, *args, **kwargs):
         )
         
         # Velocity Smoother
+        # Remapping: controller publishes cmd_vel_nav → smoother smooths → cmd_vel_smoothed
+        # Collision monitor then reads cmd_vel_smoothed and publishes final cmd_vel to robot.
         velocity_smoother = Node(
             package='nav2_velocity_smoother',
             executable='velocity_smoother',
@@ -489,7 +495,27 @@ def generate_full_stack(context, *args, **kwargs):
                 ('/tf', '/tf'),
                 ('/tf_static', '/tf_static'),
                 ('cmd_vel', 'cmd_vel_nav'),
-                ('cmd_vel_smoothed', 'cmd_vel'),
+                ('cmd_vel_smoothed', 'cmd_vel_smoothed'),
+            ]
+        )
+
+        # Collision Monitor
+        # HARD SAFETY BRAKE: intercepts cmd_vel_smoothed, stops robot if LiDAR
+        # predicts a collision within time_before_collision seconds.
+        # Without this node the collision_monitor config in the yaml was unused.
+        collision_monitor = Node(
+            package='nav2_collision_monitor',
+            executable='collision_monitor',
+            name='collision_monitor',
+            namespace=robot_name,
+            output='screen',
+            parameters=[nav2_config],
+            remappings=[
+                ('/tf', '/tf'),
+                ('/tf_static', '/tf_static'),
+                ('cmd_vel_in_topic', 'cmd_vel_smoothed'),
+                ('cmd_vel_out_topic', 'cmd_vel'),
+                ('scan', 'scan'),
             ]
         )
         
@@ -500,11 +526,14 @@ def generate_full_stack(context, *args, **kwargs):
             bt_navigator,
             waypoint_follower,
             velocity_smoother,
+            collision_monitor,
             nav2_lifecycle_manager,
         ])
     
     # Frontier Exploration
-    if use_exploration and pkg_exploration:
+    # Skipped when use_global_coordinator=true — the central frontier_coordinator
+    # (ausra_global_explorer package) sends NavigateToPose goals directly to Nav2.
+    if use_exploration and pkg_exploration and not use_global_coordinator:
         # Load and process exploration config
         exploration_base_config = os.path.join(
             get_package_share_directory('ausra_spawner'),
@@ -542,6 +571,13 @@ def generate_full_stack(context, *args, **kwargs):
             parameters=[exploration_params]
         )
         exploration_nodes.append(exploration_node)
+    elif use_global_coordinator:
+        # Log clearly so the operator knows which mode is active
+        exploration_nodes.append(
+            LogInfo(msg=f'>>> [{robot_name}] use_global_coordinator=true — '
+                        f'local explore_lite SKIPPED. '
+                        f'Run: ros2 launch ausra_global_explorer global_frontier.launch.py')
+        )
     
     # ============== EVENT CHAIN ==============
     # Staged launch order:
@@ -609,14 +645,16 @@ def generate_full_stack(context, *args, **kwargs):
             )
         )
         actions.append(load_early_after_driver)
-    
+
     # Stage 2: Nudge the robot slightly so SLAM can register initial scans
-    # SLAM needs the robot to move to populate the map and publish the 'map' TF
-    if use_slam:
+    # SLAM needs the robot to move to populate the map and publish the 'map' TF.
+    # NOTE: When use_global_coordinator=True, the central coordinator's bootstrap
+    # mode handles SLAM seeding instead — skip the nudge to avoid unsolicited movement.
+    if use_slam and not use_global_coordinator:
         nudge_cmd = ExecuteProcess(
             cmd=['bash', '-c',
                  f'ros2 topic pub --once /{robot_name}/cmd_vel geometry_msgs/msg/Twist '
-                 f'"{{linear: {{x: 0.1, y: 0.0, z: 0.0}}, angular: {{x: 0.0, y: 0.0, z: 0.3}}}}" '
+                 f'"{{linear: {{x: 0.1, y: 0.0, z: 0.0}}, angular: {{x: 0.0, y: 0.0, z: 0.3}}}}\" '
                  f'&& sleep 2 '
                  f'&& ros2 topic pub --once /{robot_name}/cmd_vel geometry_msgs/msg/Twist '
                  f'"{{linear: {{x: 0.0, y: 0.0, z: 0.0}}, angular: {{x: 0.0, y: 0.0, z: 0.0}}}}"'
@@ -722,6 +760,15 @@ def generate_launch_description():
             'use_exploration',
             default_value='false',
             description='Enable frontier exploration'
+        ),
+        DeclareLaunchArgument(
+            'use_global_coordinator',
+            default_value='true',
+            description=(
+                'true  = disable per-robot explore_lite; '
+                'central frontier_coordinator (ausra_global_explorer) sends goals. '
+                'false = run per-robot ausra_frontier_exploration (single-robot or legacy mode).'
+            )
         ),
         
         # Use OpaqueFunction to handle dynamic configuration

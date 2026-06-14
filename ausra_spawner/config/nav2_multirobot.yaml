@@ -162,14 +162,14 @@ controller_server:
       plugin: "dwb_core::DWBLocalPlanner"
       debug_trajectory_details: false
       
-      # Velocity limits for omni robot - equal in all directions
-      min_vel_x: -0.35
-      max_vel_x: 0.35
-      min_vel_y: -0.35              # Full lateral for omni
-      max_vel_y: 0.35
-      max_vel_theta: 1.0          # Reduced - omni doesn't need to rotate much
+      # Velocity limits — reduced for safer wall avoidance
+      min_vel_x: -0.22
+      max_vel_x: 0.22
+      min_vel_y: -0.22              # Full lateral for omni
+      max_vel_y: 0.22
+      max_vel_theta: 0.8          # Reduced rotation speed too
       min_speed_xy: 0.0
-      max_speed_xy: 0.35
+      max_speed_xy: 0.22
       min_speed_theta: 0.0
       
       # Acceleration limits
@@ -187,10 +187,10 @@ controller_server:
       sim_time: 2.5                 # Reasonable lookahead
       linear_granularity: 0.05
       angular_granularity: 0.025
-      transform_tolerance: 0.2
+      transform_tolerance: 0.5    # Increased from 0.2 — handles Gazebo sim_time lag
       
-      # Goal tolerance
-      xy_goal_tolerance: 0.5         # Larger tolerance (50cm)
+      # Goal tolerance — must match general_goal_checker xy_goal_tolerance
+      xy_goal_tolerance: 0.25        # Tighter: 25cm matches goal checker (prevents wall-proximity stops)
       
       # Short circuit - stop early if perfect trajectory found
       short_circuit_trajectory_evaluation: true
@@ -249,6 +249,7 @@ local_costmap:
       height: 5
       resolution: 0.05
       robot_radius: 0.15
+      transform_tolerance: 0.5    # Increased — handles sim_time lag under 3-robot Gazebo load
       plugins: ["obstacle_layer", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
@@ -276,8 +277,8 @@ local_costmap:
           obstacle_min_range: 0.0
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0    # Steeper falloff
-        inflation_radius: 0.35      # Reduced inflation for tighter navigation
+        cost_scaling_factor: 2.5    # Gentler falloff = wider safe zone
+        inflation_radius: 0.50      # 50cm buffer: robot(15cm) + safety(35cm)
       always_send_full_costmap: true
 
 # ------------------------------------------------------------------------------
@@ -344,8 +345,8 @@ global_costmap:
           obstacle_min_range: 0.0
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0     # Steeper falloff
-        inflation_radius: 0.45       # Reduced inflation for tighter paths
+        cost_scaling_factor: 2.5     # Gentler falloff = wider safe zone
+        inflation_radius: 0.55       # 55cm on global: gives planner more wall clearance
       always_send_full_costmap: false  # Too large - send updates only
 
 # ------------------------------------------------------------------------------
@@ -366,7 +367,7 @@ planner_server:
       max_iterations: 1000000            # High for large costmap
       max_on_approach_iterations: 1000   
       max_planning_time: 5.0             # More time for large costmap
-      cost_travel_multiplier: 50.0       # HIGH cost penalty - strongly avoid inflated areas
+      cost_travel_multiplier: 100.0      # Very HIGH - strongly avoids inflated areas near walls
       use_final_approach_orientation: false  # Omni robot
 
 # ------------------------------------------------------------------------------
@@ -438,8 +439,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: false
     feedback: "OPEN_LOOP"
-    max_velocity: [0.5, 0.5, 1.0]
-    min_velocity: [-0.5, -0.5, -1.0]
+    max_velocity: [0.22, 0.22, 0.8]
+    min_velocity: [-0.22, -0.22, -0.8]
     max_accel: [2.5, 2.5, 3.2]
     max_decel: [-2.5, -2.5, -3.2]
     odom_topic: odom
@@ -455,8 +456,8 @@ collision_monitor:
     use_sim_time: true
     base_frame_id: <robot_namespace>_robot_footprint
     odom_frame_id: <robot_namespace>_odom
-    cmd_vel_in_topic: cmd_vel_smoothed
-    cmd_vel_out_topic: cmd_vel
+    cmd_vel_in_topic: cmd_vel_smoothed   # From velocity smoother
+    cmd_vel_out_topic: cmd_vel            # To robot driver
     state_topic: collision_monitor_state
     transform_tolerance: 0.5    # Increased from 0.2
     source_timeout: 1.0
@@ -467,15 +468,21 @@ collision_monitor:
       type: "polygon"
       action_type: "approach"
       footprint_topic: local_costmap/published_footprint
-      time_before_collision: 2.0
-      simulation_time_step: 0.1
-      min_points: 6
-      visualize: false
+      time_before_collision: 1.5
+      simulation_time_step: 0.02
+      min_points: 4
+      visualize: true
       enabled: true
-    observation_sources: ["scan"]
+    observation_sources: ["scan", "neighbor_obstacles"]
     scan:
       type: "scan"
-      topic: scan
-      min_height: 0.15
+      topic: scan              # Relative — resolves to /{robot}/scan in namespace
+      min_height: 0.05
+      max_height: 2.0
+      enabled: true
+    neighbor_obstacles:
+      type: "pointcloud"
+      topic: neighbor_obstacles   # Relative — resolves to /{robot}/neighbor_obstacles
+      min_height: 0.0
       max_height: 2.0
       enabled: true

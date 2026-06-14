@@ -28,10 +28,10 @@ from ament_index_python.packages import get_package_share_directory
 # Spawn offsets MUST match spawn_ausra_full.launch.py x, y arguments
 # AND the static TF published by map_offset_node.
 ROBOT_SPAWN_POSES = {
-    'ausra_1': {'x': 3.0, 'y': 0.0},
-    'ausra_2': {'x': 0.0, 'y': 2.0},
+    'ausra_1': {'x': 2.0, 'y': 5.0},
+    'ausra_2': {'x': -8.0, 'y': 4.0},
     # Add more robots here:
-    # 'ausra_3': {'x': 4.0, 'y': 0.0},
+    'ausra_3': {'x': 7.0, 'y': -4.0},
 }
 # ── END EDIT SECTION ──────────────────────────────────────────────────────
 
