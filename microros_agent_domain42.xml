@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  microros_agent_domain42.xml — FastDDS profile for micro-ROS agent
+  =================================================================
+  WHY THIS FILE EXISTS:
+    The micro-ROS agent (eProsima Micro XRCE-DDS Agent) creates DDS proxy
+    participants on behalf of XRCE-DDS clients (ESP32) using FastDDS directly,
+    bypassing the rmw abstraction layer.  Because of this, the standard
+    ROS_DOMAIN_ID environment variable has NO effect on the domain the proxy
+    participants are created in — they default to domain 0.
+
+    This file forces all FastDDS participants created by the agent onto
+    domain 42, matching the Jetson hardware stack (hardware_with_comms.launch.py).
+
+  HOW IT IS USED:
+    start_micro_ros_agent.sh exports:
+      FASTRTPS_DEFAULT_PROFILES_FILE=<path to this file>
+    FastDDS automatically loads this file and applies the default participant
+    profile (is_default_prof="true") to all DomainParticipants it creates,
+    including the XRCE-DDS proxy participants for the ESP32.
+
+  CHANGING THE DOMAIN:
+    If you change the Jetson's ROS_DOMAIN_ID in hardware_with_comms.launch.py,
+    update the <domainId> value below to match.
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+
+  <!--
+    Default participant profile — applied to ALL FastDDS participants created
+    by the micro-ROS agent, including the XRCE-DDS proxy for the ESP32.
+  -->
+  <participant profile_name="default_xrce_participant" is_default_prof="true">
+    <domainId>42</domainId>
+    <rtps>
+      <name>micro_ros_agent_xrce_proxy</name>
+    </rtps>
+  </participant>
+
+</profiles>

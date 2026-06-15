@@ -1,0 +1,21 @@
+/**:
+  ros__parameters:
+
+    camera:
+      i_pipeline_type: "RGBD"        # RGB + Depth, no AI on device
+      i_nn_type: "none"
+
+    rgb:
+      i_resolution: "720P"
+      i_fps: 30.0
+      i_publish_topic: true
+      i_frame_id: "ausra_2_camera_link_optical"
+
+    stereo:
+      i_align_depth: true             # aligns depth to RGB frame
+      i_publish_topic: true
+      i_subpixel: true                # better depth accuracy on OAK-D Lite
+      i_lr_check: true                # left-right consistency check
+
+    rgb_camera_info:
+      i_publish_topic: true

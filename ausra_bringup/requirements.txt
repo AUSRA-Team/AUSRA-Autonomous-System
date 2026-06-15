@@ -1,0 +1,8 @@
+# AUSRA Bringup — Python dependencies
+# Install with: pip3 install --no-cache-dir -r requirements.txt
+#
+# eclipse-zenoh: Zenoh Python SDK for ns_resolver.py (pre-ROS namespace negotiation)
+# sdnotify:      systemd sd_notify bindings for Type=notify service readiness signaling
+
+eclipse-zenoh>=1.0.0,<2.0.0
+sdnotify>=0.3.2

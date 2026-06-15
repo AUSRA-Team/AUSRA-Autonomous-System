@@ -52,6 +52,34 @@ AGENT_EXTRA_ARGS="${AGENT_EXTRA_ARGS:-}"
 # Max seconds to wait for the ESP32 to connect and establish an XRCE-DDS session
 SESSION_READY_TIMEOUT="${SESSION_READY_TIMEOUT:-30}"
 
+# ── DDS environment (must match hardware_with_comms.launch.py) ──────────────
+# The CYCLONEDDS_URI raises MaxAutoParticipantIndex from the default of ~9 to
+# 500.  Without this, when the full hardware stack is running (slam, nav2 x6,
+# ekf, lidar, imu, omni_driver, relay_node, zenoh…) the default participant-ID
+# limit is exhausted and the micro-ROS agent's ESP32 proxy participants cannot
+# register — making the esp32_base_controller node and its topics invisible.
+#
+# Do NOT set ROS_LOCALHOST_ONLY=1 here.  The micro_ros_agent binary uses
+# FastDDS directly (bypassing the RMW layer), so it always uses the WiFi
+# interface regardless of that env var.  Setting ROS_LOCALHOST_ONLY=1 on the
+# CycloneDDS hardware nodes restricts them to loopback — then CycloneDDS
+# (loopback) and FastDDS (WiFi) cannot discover each other even on the same
+# machine.  Domain isolation via different ROS_DOMAIN_IDs also doesn't help
+# because FastDDS ignores ROS_DOMAIN_ID for its internal participant creation.
+#
+# Keep ROS_DOMAIN_ID=0 and no ROS_LOCALHOST_ONLY. Both the hardware stack
+# (CycloneDDS) and the micro-ROS agent (FastDDS) discover each other on the
+# WiFi interface on domain 0.  The Zenoh bridge's allowlist controls what
+# actually crosses the WiFi link to the laptop.
+export ROS_DOMAIN_ID=0
+export ROS_LOCALHOST_ONLY=1
+export FASTRTPS_DEFAULT_PROFILES_FILE=/home/ausranano/ausra_NM_ws/src/AUSRA-Autonomous-System/fastdds_localhost.xml
+# export CYCLONEDDS_URI="${CYCLONEDDS_URI:-<CycloneDDS><Domain><Discovery><MaxAutoParticipantIndex>500</MaxAutoParticipantIndex></Discovery></Domain></CycloneDDS>}"
+info "(ROS_LOCALHOST_ONLY — both on WiFi and FASTRTPS_DEFAULT_PROFILES_FILE set to localhost.xml)"
+# info "DDS: domain=${ROS_DOMAIN_ID}  (no ROS_LOCALHOST_ONLY — FastDDS+CycloneDDS both on WiFi)"
+# info "CYCLONEDDS_URI=${CYCLONEDDS_URI}"
+echo ""
+
 # ── Argument validation ──────────────────────────────────────
 if [[ $# -lt 1 ]]; then
     die "Usage: $0 <robot_namespace> [serial_device]

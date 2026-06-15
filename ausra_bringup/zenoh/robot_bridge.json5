@@ -1,0 +1,61 @@
+// AUSRA Zenoh-ROS2 bridge config — per-robot template.
+// gen_zenoh_config.sh substitutes __ROBOT_NS__ with the actual namespace.
+//
+// DISCOVERY: Peer mode + multicast scouting — no hardcoded router IP.
+// All Zenoh peers (Jetsons + laptop) discover each other automatically
+// on the same LAN via multicast (224.0.0.224:7446).
+{
+  plugins: {
+    ros2dds: {
+      domain: 0,
+      namespace: "/__ROBOT_NS__",
+
+      // ── Topics this robot publishes OUTWARD onto the shared Zenoh session ──
+      // These are the ONLY topics that cross Wi-Fi. Everything else is local.
+      allow: {
+        publishers: [
+          "/__ROBOT_NS__/supervisor/status",
+          "/__ROBOT_NS__/supervisor/heartbeat",
+          "/__ROBOT_NS__/map",
+          "/localized_scan",
+          "ausra/heartbeat/__ROBOT_NS__"
+        ],
+
+        // ── Topics this robot subscribes to FROM the shared Zenoh session ──
+        subscribers: [
+          "/__ROBOT_NS__/supervisor/task_goal",
+          "/__ROBOT_NS__/supervisor/explore_cmd",
+          "/fleet/estop_all",
+          "/fleet/task_broadcast",
+          "/fleet/explore_all"
+        ],
+
+        service_servers: [],
+        service_clients: [],
+        action_servers:  [],
+        action_clients:  [],
+      },
+
+      // CRITICAL: topics NOT listed above (odom, scan, tf, joint_states,
+      // filtered_odometry, cmd_vel, joint_group_velocity_controller/commands)
+      // are never bridged. They stay in the Jetson's local ROS 2 domain.
+
+      reliable_routes_blocking: true,
+    },
+  },
+
+  mode: "peer",
+  listen: {
+    endpoints: ["tcp/0.0.0.0:7447"],
+  },
+  scouting: {
+    multicast: {
+      enabled: true,
+      address: "224.0.0.224:7446",
+      interface: "auto",
+    },
+    gossip: {
+      enabled: true,
+    },
+  },
+}

@@ -49,7 +49,6 @@ def generate_full_hardware_stack(context):
     lidar_frame = f'{robot_name}_lidar'
     imu_frame  = f'{robot_name}_imu_link'
     map_frame  = f'{robot_name}_map'
-    
 
     # ── Package directories ───────────────────────────────────────────────
     pkg_lidar_slam  = get_package_share_directory('lidar_slam_pkg')
@@ -58,11 +57,10 @@ def generate_full_hardware_stack(context):
     pkg_description  = get_package_share_directory('ausrabot_description')
     pkg_lidar        = get_package_share_directory('sllidar_ros2')
     pkg_imu          = get_package_share_directory('mpu6050driver')
-    pkg_perception   = get_package_share_directory('ausra_yolo')
+
     # ── Config paths ──────────────────────────────────────────────────────
     nav2_params_file   = os.path.join(pkg_lidar_slam, 'config', 'nav2_holonomic_params.yaml')
     slam_config_file   = os.path.join(pkg_lidar_slam, 'config', 'slam_toolbox_config.yaml')
-    oak_d_lite_config = os.path.join(pkg_perception, 'config', 'oak_d_lite.yaml')
     # hardware_params    = os.path.join(pkg_description, 'config', 'hardware_params.yaml')
     xacro_file         = os.path.join(pkg_description, 'urdf', 'robot.urdf.xacro')
     explore_params_file = os.path.join(pkg_lidar_slam, 'config', 'explore_params.yaml')
@@ -72,7 +70,7 @@ def generate_full_hardware_stack(context):
 
     # ── Launch Configurations ─────────────────────────────────────────────
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
-    nudge_robot  = LaunchConfiguration('nudge_robot', default='true')
+    nudge_robot  = LaunchConfiguration('nudge_robot', default='false')
 
     # Get spawn position
     x = LaunchConfiguration('x', default='0.0').perform(context)
@@ -414,42 +412,14 @@ def generate_full_hardware_stack(context):
         velocity_smoother,
         nav2_lifecycle_manager,
     ])
-    oak_camera_node = Node(
-        package='depthai_ros_driver',
-        executable='camera_node',
-        name='camera', # Critical: named 'camera' to match YOLO's expected topics
-        output='screen',
-        parameters=[oak_d_lite_config],
-    )
-
-    ausra_yolo_node = Node(
-        package='ausra_yolo',
-        executable='ausra_yolo', 
-        name='ausra_yolo_node',
-        output='screen',
-        parameters=[{
-            'robot_name': robot_name,
-            'use_sim': False # Explicitly false for hardware stack
-        }],
-    )
 
     # ══════════════════════════════════════════════════════════════════════
-    # Stage 3: Exploration
+    # Stage 3: Exploration — REMOVED
+    # explore_lite is no longer auto-started. It is launched on-demand as a
+    # subprocess by ausra_supervisor when the fleet sends an explore_cmd.
+    # explore_params_file is retained so it can be resolved and passed to
+    # the supervisor service at startup.
     # ══════════════════════════════════════════════════════════════════════
-
-    exploration_server = Node(
-        package='explore_lite',
-        name='explore_node',
-        executable='explore',
-        parameters=[explore_params_file, {
-            'use_sim_time': False,
-            'robot_base_frame': base_frame,
-            # Override absolute topics from YAML with relative ones.
-            'costmap_topic': 'global_costmap/costmap',
-            'costmap_updates_topic': 'global_costmap/costmap_updates',
-        }],
-        output='screen',
-    )
 
     # ══════════════════════════════════════════════════════════════════════
     # Assemble — Wrap EVERYTHING in GroupAction + PushRosNamespace
@@ -489,8 +459,6 @@ def generate_full_hardware_stack(context):
                     # imu_filter_node,
                     ekf_node,
                     slam_toolbox,
-                    oak_camera_node,
-                    ausra_yolo_node,
                 ])
             ]
         ),
@@ -506,17 +474,7 @@ def generate_full_hardware_stack(context):
             ] + nav2_nodes
         ),
 
-        # Stage 3: Exploration (30 s delay)
-        TimerAction(
-            period=10.0,
-            actions=[
-                GroupAction(actions=[
-                    PushRosNamespace(robot_name),
-                    LogInfo(msg=f'>>> [{robot_name}] Stage 3: Starting Frontier Exploration...'),
-                    exploration_server,
-                ])
-            ]
-        ),
+        # (Stage 3 removed — explore_lite is launched on-demand by the supervisor)
     ]
 
     # Stage 4: Nudge (Optional — uses fully-qualified topic since
@@ -524,20 +482,20 @@ def generate_full_hardware_stack(context):
     if nudge_robot.perform(context) == 'true':
         namespaced_actions.append(
             TimerAction(
-                period=20.0,
+                period=35.0,
                 actions=[
                     LogInfo(msg=f'>>> [{robot_name}] Stage 4: Nudging robot to seed SLAM...'),
                     ExecuteProcess(
-                        cmd=['ros2', 'topic', 'pub',
+                        cmd=['ros2', 'topic', 'pub', '--once',
                              f'/{robot_name}/cmd_vel', 'geometry_msgs/msg/Twist',
-                             '"{linear: {x: 0.1, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"'],
+                             '"{linear: {x: 0.1, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.3}}"'],
                         output='screen'
                     ),
                     TimerAction(
                         period=2.0,
                         actions=[
                             ExecuteProcess(
-                                cmd=['ros2', 'topic', 'pub',
+                                cmd=['ros2', 'topic', 'pub', '--once',
                                      f'/{robot_name}/cmd_vel', 'geometry_msgs/msg/Twist',
                                      '"{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"'],
                                 output='screen'
@@ -567,7 +525,7 @@ def generate_launch_description():
             description='Use simulation clock'),
         DeclareLaunchArgument(
             'nudge_robot',
-            default_value='true',
+            default_value='false',
             description='Automatically nudge the robot to seed SLAM'),
         DeclareLaunchArgument('x', default_value='0.0', description='X position'),
         DeclareLaunchArgument('y', default_value='0.0', description='Y position'),

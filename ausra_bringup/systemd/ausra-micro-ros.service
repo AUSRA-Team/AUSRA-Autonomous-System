@@ -1,0 +1,23 @@
+[Unit]
+Description=AUSRA micro-ROS agent (ESP32-S3 bridge)
+Documentation=https://github.com/AUSRA-Team
+After=ausra-ns-resolver.service
+Requires=ausra-ns-resolver.service
+
+[Service]
+Type=notify
+EnvironmentFile=/etc/ausra/ausra.env
+EnvironmentFile=/etc/ausra/namespace.env
+ExecStart=/bin/bash /home/ausranano/ausra_NM_ws/src/AUSRA-Autonomous-System/ausra_bringup/scripts/start_micro_ros.sh
+NotifyAccess=all
+Restart=always
+RestartSec=5
+TimeoutStartSec=90
+User=ausranano
+# Grant access to serial devices
+SupplementaryGroups=dialout
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

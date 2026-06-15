@@ -1,0 +1,53 @@
+// AUSRA Zenoh-ROS2 bridge config — base-station (laptop).
+// Subscribes to all robots' supervisor/map topics via wildcards.
+//
+// DISCOVERY: Peer mode + multicast scouting — no hardcoded IPs.
+{
+  plugins: {
+    ros2dds: {
+      domain: 0,
+      namespace: "/",
+
+      allow: {
+        // Subscribe to all robots' status and maps dynamically
+        publishers: [
+          "/**/supervisor/task_goal",
+          "/fleet/estop_all",
+          "/fleet/task_broadcast",
+          "ausra/ns-claim/**"
+        ],
+
+        // Receive status, heartbeats, and maps from all robots
+        subscribers: [
+          "/**/supervisor/status",
+          "/**/supervisor/heartbeat",
+          "/**/map",
+          "/localized_scan",
+          "ausra/heartbeat/**"
+        ],
+
+        service_servers: [],
+        service_clients: [],
+        action_servers:  [],
+        action_clients:  [],
+      },
+
+      reliable_routes_blocking: true,
+    },
+  },
+
+  mode: "peer",
+  listen: {
+    endpoints: ["tcp/0.0.0.0:7447"],
+  },
+  scouting: {
+    multicast: {
+      enabled: true,
+      address: "224.0.0.224:7446",
+      interface: "auto",
+    },
+    gossip: {
+      enabled: true,
+    },
+  },
+}

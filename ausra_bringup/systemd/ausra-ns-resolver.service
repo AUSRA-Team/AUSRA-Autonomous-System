@@ -1,0 +1,21 @@
+[Unit]
+Description=AUSRA dynamic namespace resolver (pre-ROS Zenoh negotiation)
+Documentation=https://github.com/AUSRA-Team
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+RemainAfterExit=yes
+EnvironmentFile=/etc/ausra/ausra.env
+ExecStart=/usr/bin/python3 /home/ausranano/ausra_NM_ws/src/AUSRA-Autonomous-System/ausra_bringup/scripts/ns_resolver.py
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=120
+# Runs as root to write to /etc/ausra/namespace and /etc/ausra/namespace.env
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

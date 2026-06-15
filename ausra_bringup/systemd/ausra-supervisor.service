@@ -1,0 +1,38 @@
+[Unit]
+Description=AUSRA robot supervisor sidecar (health, task FSM, e-stop)
+Documentation=https://github.com/AUSRA-Team
+After=ausra-ros-stack.service
+Requires=ausra-ros-stack.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/ausra/ausra.env
+EnvironmentFile=/etc/ausra/namespace.env
+ExecStart=/bin/bash -c '\
+    set +u && \
+    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    source ${AUSRA_WS}/install/setup.bash && \
+    source ${MICROROS_WS}/install/setup.bash && \
+    set -e && \
+    EXPLORE_PARAMS=$(ros2 pkg prefix lidar_slam_pkg)/share/lidar_slam_pkg/config/explore_params.yaml && \
+    exec ros2 run ausra_supervisor supervisor_node \
+        --ros-args \
+        -r __ns:=/${AUSRA_ROBOT_NAME} \
+        -p robot_name:=${AUSRA_ROBOT_NAME} \
+        -p max_retries:=2 \
+        -p watchdog_timeout_odom:=0.5 \
+        -p watchdog_timeout_scan:=0.4 \
+        -p watchdog_timeout_ekf:=0.5 \
+        -p heartbeat_hz:=2.0 \
+        -p status_hz:=1.0 \
+        -p estop_duration_sec:=3.0 \
+        -p explore_params_file:=${EXPLORE_PARAMS} \
+        -p frontier_idle_timeout_sec:=15.0'
+Restart=always
+RestartSec=5
+User=ausranano
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

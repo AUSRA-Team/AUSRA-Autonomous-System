@@ -1,0 +1,28 @@
+[Unit]
+Description=AUSRA ROS 2 hardware stack (SLAM, Nav2, EKF, drivers)
+Documentation=https://github.com/AUSRA-Team
+After=ausra-micro-ros.service
+Requires=ausra-micro-ros.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/ausra/ausra.env
+EnvironmentFile=/etc/ausra/namespace.env
+ExecStart=/bin/bash -c '\
+    set +u && \
+    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    source ${AUSRA_WS}/install/setup.bash && \
+    source ${MICROROS_WS}/install/setup.bash && \
+    set -e && \
+    exec ros2 launch ausra_bringup hardware_full_stack.launch.py \
+        robot_name:=${AUSRA_ROBOT_NAME} \
+        use_sim_time:=false'
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+User=ausranano
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

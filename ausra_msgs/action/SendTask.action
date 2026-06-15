@@ -1,0 +1,11 @@
+# Goal
+string robot_name
+geometry_msgs/PoseStamped goal
+string task_id
+---
+# Result
+bool success
+string failure_reason
+---
+# Feedback
+ausra_msgs/RobotStatus feedback

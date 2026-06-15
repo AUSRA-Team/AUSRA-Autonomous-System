@@ -1,0 +1,20 @@
+[Unit]
+Description=AUSRA Zenoh-ROS2 bridge (selective topic bridging over Wi-Fi)
+Documentation=https://github.com/AUSRA-Team
+After=ausra-ros-stack.service
+Requires=ausra-ros-stack.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/ausra/ausra.env
+EnvironmentFile=/etc/ausra/namespace.env
+ExecStartPre=/bin/bash /home/ausranano/ausra_NM_ws/src/AUSRA-Autonomous-System/ausra_bringup/scripts/gen_zenoh_config.sh
+ExecStart=/bin/bash -c 'exec ${ZENOH_BRIDGE_BIN} --config /tmp/ausra_zenoh_bridge.json5'
+Restart=always
+RestartSec=3
+User=ausranano
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
