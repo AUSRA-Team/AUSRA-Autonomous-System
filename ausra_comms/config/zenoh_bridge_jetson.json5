@@ -6,14 +6,13 @@
       namespace: "/",
       allow: {
         publishers: [
-          "/ausra_.*/map",
-          //"/ausra_.*/map_compressed",
+          // "/ausra_.*/map",
+          "/ausra_.*/map_compressed",
           "/ausra_.*/heartbeat",
-          "/ausra_.*/explore/frontiers",
         ],
         subscribers: [
-          "/ausra_.*/map",
-          // "/ausra_.*/map_compressed",
+          // "/ausra_.*/map",
+          "/ausra_.*/map_compressed",
           "/ausra_.*/heartbeat",
         ],
         service_servers: [],
@@ -43,6 +42,7 @@
   connect: {
     endpoints: [
       "tcp/192.168.0.165:7447",
+      "tcp/192.168.0.129:7447",
       "tcp/192.168.0.105:7447",
     ],
   },

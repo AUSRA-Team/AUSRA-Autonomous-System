@@ -45,12 +45,12 @@ def generate_launch_description():
                                description='Robot name (e.g. ausra_1, ausra_2)'),
         DeclareLaunchArgument('use_sim_time', default_value='false',
                                description='Use simulation clock'),
-        DeclareLaunchArgument('nudge_robot', default_value='false',
+        DeclareLaunchArgument('nudge_robot', default_value='true',
                                description='Auto-nudge robot to seed SLAM'),
         DeclareLaunchArgument('use_zenoh', default_value='true',
                                description='Start Zenoh cross-WiFi bridge'),
-        DeclareLaunchArgument('enable_compression', default_value='false',
-                               description='Enable zlib map compression'),
+        DeclareLaunchArgument('enable_compression', default_value='true',
+                               description='zlib-compress maps to /ausra_X/map_compressed'),
 
         LogInfo(msg='\n'
             '╔══════════════════════════════════════════════════════════════╗\n'
@@ -83,7 +83,7 @@ def generate_launch_description():
                         'robot_name': robot_name,
                         'map_interval_sec': 5.0,
                         'base_station_ip': '192.168.0.105',
-                        'enable_compression': False,
+                        'enable_compression': LaunchConfiguration('enable_compression'),
                         'enable_adaptive_throttle': True,
                         'enable_delta_detection': True,
                         'delta_threshold': 0.01,

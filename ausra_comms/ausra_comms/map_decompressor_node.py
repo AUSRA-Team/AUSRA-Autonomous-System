@@ -3,9 +3,11 @@ import zlib
 
 import rclpy
 from rclpy.node import Node
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from nav_msgs.msg import OccupancyGrid, MapMetaData
-from std_msgs.msg import ByteMultiArray
+from std_msgs.msg import UInt8MultiArray
 from geometry_msgs.msg import Pose, Point, Quaternion
 from builtin_interfaces.msg import Time
 
@@ -16,20 +18,28 @@ class MapDecompressorNode(Node):
 
         self.declare_parameter('robots', ['ausra_1', 'ausra_2'])
         self.declare_parameter('ignore_robot', '')
-        
+
         robots = self.get_parameter('robots').value
         ignore_robot = self.get_parameter('ignore_robot').value
 
         self.decompress_count = {r: 0 for r in robots}
 
+        # ReentrantCallbackGroup + MultiThreadedExecutor so multiple robots'
+        # maps decompress concurrently instead of serializing behind one thread.
+        self.cb_group = ReentrantCallbackGroup()
+
+        # Match the relay's TRANSIENT_LOCAL + RELIABLE so a map published before
+        # this node starts (or during a WiFi blip) is still delivered. depth=2
+        # absorbs jitter without dropping.
         output_qos = QoSProfile(
-            depth=1,
+            depth=2,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
             reliability=ReliabilityPolicy.RELIABLE,
         )
 
         input_qos = QoSProfile(
-            depth=1,
+            depth=2,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
             reliability=ReliabilityPolicy.RELIABLE,
         )
 
@@ -38,17 +48,18 @@ class MapDecompressorNode(Node):
             if robot == ignore_robot:
                 self.get_logger().info(f'Ignoring local robot: {robot}')
                 continue
-                
+
             active_robots.append(robot)
-            
+
             pub = self.create_publisher(
                 OccupancyGrid, f'/{robot}/map', output_qos)
 
             self.create_subscription(
-                ByteMultiArray,
+                UInt8MultiArray,
                 f'/{robot}/map_compressed',
                 lambda msg, r=robot, p=pub: self._decompress_cb(msg, r, p),
-                input_qos)
+                input_qos,
+                callback_group=self.cb_group)
 
             self.get_logger().info(
                 f'Decompressor: /{robot}/map_compressed → /{robot}/map')
@@ -98,7 +109,9 @@ class MapDecompressorNode(Node):
                     z=float(metadata['qz']),
                     w=float(metadata['qw'])))
 
-            grid.data = list(raw_data)
+            # raw_data is unsigned (0..255); OccupancyGrid.data is int8, so map
+            # values >127 (e.g. the 255 that encodes unknown=-1) back to signed.
+            grid.data = [b - 256 if b > 127 else b for b in raw_data]
 
             publisher.publish(grid)
             self.decompress_count[robot_name] += 1
@@ -121,11 +134,14 @@ class MapDecompressorNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = MapDecompressorNode()
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         node.get_logger().info('Map decompressor shutting down')
     finally:
+        executor.shutdown()
         node.destroy_node()
         rclpy.shutdown()
 

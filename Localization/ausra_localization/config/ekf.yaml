@@ -122,8 +122,8 @@
 # required. Data is specified at the level of pose and twist variables, rather than for each variable in isolation.
 # For messages that have both pose and twist data, the parameter specifies to which part of the message we are applying
 # the thresholds.
-        odom0_pose_rejection_threshold: 3.0
-        odom0_twist_rejection_threshold: 2.0
+        # odom0_pose_rejection_threshold: 3.0
+        # odom0_twist_rejection_threshold: 2.0
 
 # Further input parameter examples
         # odom1: example/odom2
@@ -170,9 +170,9 @@
         imu0_differential: false
         imu0_relative: true
         imu0_queue_size: 5
-        imu0_pose_rejection_threshold: 2.0                 # Note the difference in parameter names
-        imu0_twist_rejection_threshold: 2.0                #
-        imu0_linear_acceleration_rejection_threshold: 2.0  #
+        # imu0_pose_rejection_threshold: 2.0                 # Note the difference in parameter names
+        # imu0_twist_rejection_threshold: 2.0                #
+        # imu0_linear_acceleration_rejection_threshold: 2.0  #
 
 # [ADVANCED] Some IMUs automatically remove acceleration due to gravity, and others don't. If yours doesn't, please set
 # this to true, and *make sure* your data conforms to REP-103, specifically, that the data is in ENU frame.
@@ -222,8 +222,8 @@
                                    0.0,   0.0,    0.0,    0.04,   0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
                                    0.0,   0.0,    0.0,    0.0,    0.04,   0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
                                    0.0,   0.0,    0.0,    0.0,    0.0,    0.028,  0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
-                                   0.0,   0.0,    0.0,    0.0,    0.0,    0.0,    0.5,   0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
-                                   0.0,   0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.5,   0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                                   0.0,   0.0,    0.0,    0.0,    0.0,    0.0,    0.5,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                                   0.0,   0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.5,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
                                    0.0,   0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.05,   0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
                                    0.0,   0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.015,  0.0,    0.0,    0.0,    0.0,    0.0,
                                    0.0,   0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.015,  0.0,    0.0,    0.0,    0.0,

@@ -50,7 +50,6 @@ def generate_full_hardware_stack(context):
     imu_frame  = f'{robot_name}_imu_link'
     map_frame  = f'{robot_name}_map'
     
-
     # ── Package directories ───────────────────────────────────────────────
     pkg_lidar_slam  = get_package_share_directory('lidar_slam_pkg')
     pkg_localization = get_package_share_directory('ausra_localization')
@@ -58,21 +57,18 @@ def generate_full_hardware_stack(context):
     pkg_description  = get_package_share_directory('ausrabot_description')
     pkg_lidar        = get_package_share_directory('sllidar_ros2')
     pkg_imu          = get_package_share_directory('mpu6050driver')
-    pkg_perception   = get_package_share_directory('ausra_yolo')
+
     # ── Config paths ──────────────────────────────────────────────────────
     nav2_params_file   = os.path.join(pkg_lidar_slam, 'config', 'nav2_holonomic_params.yaml')
     slam_config_file   = os.path.join(pkg_lidar_slam, 'config', 'slam_toolbox_config.yaml')
-    oak_d_lite_config = os.path.join(pkg_perception, 'config', 'oak_d_lite.yaml')
-    # hardware_params    = os.path.join(pkg_description, 'config', 'hardware_params.yaml')
     xacro_file         = os.path.join(pkg_description, 'urdf', 'robot.urdf.xacro')
     explore_params_file = os.path.join(pkg_lidar_slam, 'config', 'explore_params.yaml')
     ekf_params_file    = os.path.join(pkg_localization, 'config', 'ekf.yaml')
-    imu_params_file    = os.path.join(pkg_localization, 'config', 'imu_complimentary_filter.yaml')
     mpu6050_params_file = os.path.join(pkg_imu, 'params', 'mpu6050.yaml')
 
     # ── Launch Configurations ─────────────────────────────────────────────
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
-    nudge_robot  = LaunchConfiguration('nudge_robot', default='true')
+    nudge_robot  = LaunchConfiguration('nudge_robot', default='false')
 
     # Get spawn position
     x = LaunchConfiguration('x', default='0.0').perform(context)
@@ -83,7 +79,6 @@ def generate_full_hardware_stack(context):
     # Stage 0: Core Hardware & Description
     # ══════════════════════════════════════════════════════════════════════
 
-    # Pass robot_name into xacro so all URDF links become <robot_name>_*
     robot_description = ParameterValue(
         Command(['xacro ', xacro_file, ' robot_name:=', robot_name]),
         value_type=str
@@ -106,8 +101,6 @@ def generate_full_hardware_stack(context):
         }],
     )
 
-    # Override frame IDs and joint names so the omni driver publishes
-    # TF for the correct prefixed frames.
     hardware_params_base = os.path.join(pkg_description, 'config', 'hardware_params.yaml')
     hardware_params = generate_hardware_params(robot_name, hardware_params_base)
     omni_driver = Node(
@@ -120,9 +113,6 @@ def generate_full_hardware_stack(context):
             'odom_frame_id': odom_frame,
             'base_frame_id': base_frame,
         }],
-        # Ensure the driver uses namespace-relative topics.
-        # If the driver internally publishes to "/odom" or "/cmd_vel",
-        # these remappings force them into the namespace.
         remappings=[
             ('/odom', 'odom'),
             ('/cmd_vel', 'cmd_vel'),
@@ -144,9 +134,6 @@ def generate_full_hardware_stack(context):
         }.items()
     )
 
-    # MPU6050 Raw IMU Driver — publishes sensor_msgs/Imu on relative 'imu'
-    # topic. The frame_id parameter is injected so the Imu header matches
-    # the prefixed TF tree.
     mpu6050_driver = Node(
         package='mpu6050driver',
         executable='mpu6050driver',
@@ -154,57 +141,16 @@ def generate_full_hardware_stack(context):
         output='screen',
         emulate_tty=True,
         parameters=[mpu6050_params_file, {
-            'frame_id': imu_frame,   # e.g. ausra_1_imu_link
+            'frame_id': imu_frame, 
         }],
     )
 
-    # ESP32 Micro-ROS Agent — must use ExecuteProcess because the
-    # micro_ros_agent binary expects CLI arguments, not ROS Node parameters.
-    # ExecuteProcess is NOT affected by PushRosNamespace, so we inject
-    # the namespace explicitly via --ros-args -r __ns:=.
-    micro_ros_agent = ExecuteProcess(
-        cmd=[
-            'ros2', 'run', 'micro_ros_agent', 'micro_ros_agent',
-            'serial', '--dev', '/dev/ttyACM0',
-            '--ros-args', '-r', f'__ns:=/{robot_name}',
-        ],
-        output='screen',
-    )
-
-    # ══════════════════════════════════════════════════════════════════════
-    # Stage 1: Localization (IMU Filter + EKF) + SLAM
-    # ══════════════════════════════════════════════════════════════════════
-
-    # IMU Complementary Filter — fuses raw accel + gyro into a filtered
-    # orientation.  The fixed_frame and output frame_id are overridden so
-    # the published sensor_msgs/Imu header.frame_id matches the prefixed
-    # TF tree.
-    # imu_filter_node = Node(
-    #     package='imu_complementary_filter',
-    #     executable='complementary_filter_node',
-    #     name='complementary_filter_gain_node',
-    #     output='screen',
-    #     parameters=[imu_params_file, {
-    #         'use_sim_time': use_sim_time,
-    #         'fixed_frame': odom_frame,          # was: ausrabot_odom
-    #     }],
-    #     remappings=[
-    #         # Force raw-IMU input and filtered output into the namespace.
-    #         # If the driver publishes to absolute /imu/data_raw, this
-    #         # remapping catches it.
-    #         ('/imu/data_raw', 'imu/data_raw'),
-    #         ('/imu/data',     'imu/data'),
-    #         ('/imu/mag',      'imu/mag'),
-    #         # Output filtered data on a relative topic the EKF can find.
-    #         ('/imu',          'imu'),
-    #     ],
-    # )
     map_offset_node = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
         name='map_offset_publisher',
         arguments=[
-            x, y, '0.0', yaw, '0.0', '0.0',  # x y z yaw pitch roll
+            x, y, '0.0', yaw, '0.0', '0.0',  
             'map', map_frame,
         ],
         remappings=[
@@ -214,7 +160,10 @@ def generate_full_hardware_stack(context):
         output='screen'
     )
 
-    # Inline EKF node — inject prefixed frame names and relative topics.
+    # ══════════════════════════════════════════════════════════════════════
+    # Stage 1: Localization (IMU Filter + EKF) + SLAM
+    # ══════════════════════════════════════════════════════════════════════
+
     ekf_node = Node(
         package='robot_localization',
         executable='ekf_node',
@@ -226,7 +175,6 @@ def generate_full_hardware_stack(context):
             'base_link_frame': base_frame,
             'world_frame': odom_frame,
             'map_frame': map_frame,
-            # Relative topics — PushRosNamespace will prepend /<robot_name>/.
             'odom0': 'odom',
             'imu0': 'imu',
         }],
@@ -235,7 +183,6 @@ def generate_full_hardware_stack(context):
         ],
     )
 
-    # SLAM Toolbox — override frames and use relative scan topic.
     slam_toolbox = Node(
         package='slam_toolbox',
         executable='async_slam_toolbox_node',
@@ -248,12 +195,10 @@ def generate_full_hardware_stack(context):
                 'odom_frame': odom_frame,
                 'base_frame': base_frame,
                 'map_frame': map_frame,
-                # CRITICAL: relative topic so PushRosNamespace applies.
                 'scan_topic': 'scan',
             }
         ],
         remappings=[
-            # Slam Toolbox expects absolute /scan topic by default, but we remap it to relative 'scan' so the namespace is applied.
             ('/scan', 'scan'),
             ('/map', 'map'),
         ],
@@ -263,45 +208,11 @@ def generate_full_hardware_stack(context):
     # Stage 2: Nav2 Navigation
     # ══════════════════════════════════════════════════════════════════════
 
-    # Dynamically rewrite the Nav2 YAML file to inject the prefixed frame names
-    # (e.g. ausra_1_robot_footprint) without requiring manual sed hacks.
-    #
-    # NOTE: 'global_frame' is intentionally EXCLUDED from RewrittenYaml.
-    # RewrittenYaml rewrites ALL occurrences of a key name globally. Both
-    # the global_costmap (needs 'map') and local_costmap (needs odom_frame)
-    # share a key called 'global_frame', so a blanket rewrite would corrupt
-    # one of them. Instead, we use RewrittenYaml for the safe keys, then
-    # selectively patch local_costmap.global_frame via a second pass.
-    param_substitutions = {
-        'robot_base_frame': base_frame,
-        'base_frame_id': base_frame,
-        'odom_frame_id': odom_frame,
-        'local_frame': odom_frame,
-    }
-
-    configured_nav2_params = RewrittenYaml(
-        source_file=nav2_params_file,
-        root_key='',
-        param_rewrites=param_substitutions,
-        convert_types=True
-    )
-
     nav2_nodes = []
-
     nav2_config_base = os.path.join(pkg_lidar_slam, 'config', 'nav2_holonomic_params.yaml')
-        
-    # Use YAML-aware config loading to preserve structure including DWB critics
     nav2_config = generate_nav2_config(robot_name, nav2_config_base)
     
-    # Nav2 Lifecycle Manager
-    lifecycle_nodes = [
-        'controller_server',
-        'planner_server',
-        'behavior_server',
-        'bt_navigator',
-        'waypoint_follower',
-        'velocity_smoother',
-    ]
+    
     
     nav2_lifecycle_manager = Node(
         package='nav2_lifecycle_manager',
@@ -310,7 +221,7 @@ def generate_full_hardware_stack(context):
         namespace=robot_name,
         output='screen',
         parameters=[{
-            'use_sim_time': True,
+            'use_sim_time': use_sim_time,
             'autostart': True,
             'node_names': lifecycle_nodes,
             'bond_timeout': 10.0,
@@ -319,7 +230,6 @@ def generate_full_hardware_stack(context):
         }]
     )
     
-    # Controller Server
     controller_server = Node(
         package='nav2_controller',
         executable='controller_server',
@@ -327,13 +237,9 @@ def generate_full_hardware_stack(context):
         namespace=robot_name,
         output='screen',
         parameters=[nav2_config],
-        remappings=[
-            ('/tf', '/tf'),
-            ('/tf_static', '/tf_static'),
-        ]
+        remappings=[('/tf', '/tf'), ('/tf_static', '/tf_static')]
     )
     
-    # Planner Server
     planner_server = Node(
         package='nav2_planner',
         executable='planner_server',
@@ -341,13 +247,9 @@ def generate_full_hardware_stack(context):
         namespace=robot_name,
         output='screen',
         parameters=[nav2_config],
-        remappings=[
-            ('/tf', '/tf'),
-            ('/tf_static', '/tf_static'),
-        ]
+        remappings=[('/tf', '/tf'), ('/tf_static', '/tf_static')]
     )
     
-    # Behavior Server
     behavior_server = Node(
         package='nav2_behaviors',
         executable='behavior_server',
@@ -355,13 +257,9 @@ def generate_full_hardware_stack(context):
         namespace=robot_name,
         output='screen',
         parameters=[nav2_config],
-        remappings=[
-            ('/tf', '/tf'),
-            ('/tf_static', '/tf_static'),
-        ]
+        remappings=[('/tf', '/tf'), ('/tf_static', '/tf_static')]
     )
     
-    # BT Navigator
     bt_navigator = Node(
         package='nav2_bt_navigator',
         executable='bt_navigator',
@@ -369,13 +267,9 @@ def generate_full_hardware_stack(context):
         namespace=robot_name,
         output='screen',
         parameters=[nav2_config],
-        remappings=[
-            ('/tf', '/tf'),
-            ('/tf_static', '/tf_static'),
-        ]
+        remappings=[('/tf', '/tf'), ('/tf_static', '/tf_static')]
     )
     
-    # Waypoint Follower
     waypoint_follower = Node(
         package='nav2_waypoint_follower',
         executable='waypoint_follower',
@@ -383,13 +277,9 @@ def generate_full_hardware_stack(context):
         namespace=robot_name,
         output='screen',
         parameters=[nav2_config],
-        remappings=[
-            ('/tf', '/tf'),
-            ('/tf_static', '/tf_static'),
-        ]
+        remappings=[('/tf', '/tf'), ('/tf_static', '/tf_static')]
     )
     
-    # Velocity Smoother
     velocity_smoother = Node(
         package='nav2_velocity_smoother',
         executable='velocity_smoother',
@@ -414,24 +304,6 @@ def generate_full_hardware_stack(context):
         velocity_smoother,
         nav2_lifecycle_manager,
     ])
-    oak_camera_node = Node(
-        package='depthai_ros_driver',
-        executable='camera_node',
-        name='camera', # Critical: named 'camera' to match YOLO's expected topics
-        output='screen',
-        parameters=[oak_d_lite_config],
-    )
-
-    ausra_yolo_node = Node(
-        package='ausra_yolo',
-        executable='ausra_yolo', 
-        name='ausra_yolo_node',
-        output='screen',
-        parameters=[{
-            'robot_name': robot_name,
-            'use_sim': False # Explicitly false for hardware stack
-        }],
-    )
 
     # ══════════════════════════════════════════════════════════════════════
     # Stage 3: Exploration
@@ -442,9 +314,8 @@ def generate_full_hardware_stack(context):
         name='explore_node',
         executable='explore',
         parameters=[explore_params_file, {
-            'use_sim_time': False,
+            'use_sim_time': use_sim_time,
             'robot_base_frame': base_frame,
-            # Override absolute topics from YAML with relative ones.
             'costmap_topic': 'global_costmap/costmap',
             'costmap_updates_topic': 'global_costmap/costmap_updates',
         }],
@@ -454,16 +325,6 @@ def generate_full_hardware_stack(context):
     # ══════════════════════════════════════════════════════════════════════
     # Assemble — Wrap EVERYTHING in GroupAction + PushRosNamespace
     # ══════════════════════════════════════════════════════════════════════
-    #
-    # CRITICAL: In ROS 2 Humble, TimerAction does NOT propagate
-    # PushRosNamespace to its children. Every delayed stage MUST re-push
-    # the namespace inside its own GroupAction to ensure all nodes and
-    # IncludeLaunchDescriptions inherit the correct /<robot_name>/ prefix.
-    #
-    # micro_ros_agent uses ExecuteProcess (immune to PushRosNamespace),
-    # so its namespace is injected explicitly via --ros-args -r __ns:=.
-    # It is launched OUTSIDE the GroupAction, directly in the
-    # LaunchDescription return list.
 
     namespaced_actions = [
         PushRosNamespace(robot_name),
@@ -471,7 +332,6 @@ def generate_full_hardware_stack(context):
         LogInfo(msg=f'=== AUSRA HARDWARE FULL STACK [{robot_name}] STARTING ==='),
 
         # Stage 0: Core (Immediate)
-        # send_ns,
         robot_state_publisher,
         omni_driver,
         lidar_driver,
@@ -479,67 +339,39 @@ def generate_full_hardware_stack(context):
         map_offset_node,
 
         # Stage 1: IMU Filter + EKF + SLAM (5 s delay)
-        # Each TimerAction re-pushes the namespace for its children.
         TimerAction(
             period=5.0,
             actions=[
                 GroupAction(actions=[
                     PushRosNamespace(robot_name),
-                    LogInfo(msg=f'>>> [{robot_name}] Stage 1: Starting IMU Filter, EKF and SLAM...'),
-                    # imu_filter_node,
+                    LogInfo(msg=f'>>> [{robot_name}] Stage 1: Starting EKF and SLAM...'),
                     ekf_node,
                     slam_toolbox,
-                    oak_camera_node,
-                    ausra_yolo_node,
-                ])
-            ]
-        ),
-
-        # Stage 2: Nav2 (15 s delay)
-        TimerAction(
-            period=15.0,
-            actions=[
-                GroupAction(actions=[
-                    PushRosNamespace(robot_name),
-                    LogInfo(msg=f'>>> [{robot_name}] Stage 2: Starting Nav2 Navigation...'),
-                ])
-            ] + nav2_nodes
-        ),
-
-        # Stage 3: Exploration (30 s delay)
-        TimerAction(
-            period=10.0,
-            actions=[
-                GroupAction(actions=[
-                    PushRosNamespace(robot_name),
-                    LogInfo(msg=f'>>> [{robot_name}] Stage 3: Starting Frontier Exploration...'),
-                    exploration_server,
                 ])
             ]
         ),
     ]
 
-    # Stage 4: Nudge (Optional — uses fully-qualified topic since
-    # ExecuteProcess is NOT affected by PushRosNamespace)
+    # Stage 1.5: Nudge (10 s delay - 5s after SLAM starts)
     if nudge_robot.perform(context) == 'true':
         namespaced_actions.append(
             TimerAction(
-                period=20.0,
+                period=10.0,
                 actions=[
-                    LogInfo(msg=f'>>> [{robot_name}] Stage 4: Nudging robot to seed SLAM...'),
+                    LogInfo(msg=f'>>> [{robot_name}] Nudging robot to seed SLAM map...'),
                     ExecuteProcess(
-                        cmd=['ros2', 'topic', 'pub',
+                        cmd=['ros2', 'topic', 'pub', '-1',
                              f'/{robot_name}/cmd_vel', 'geometry_msgs/msg/Twist',
-                             '"{linear: {x: 0.1, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"'],
+                             '{linear: {x: 0.1, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}'],
                         output='screen'
                     ),
                     TimerAction(
                         period=2.0,
                         actions=[
                             ExecuteProcess(
-                                cmd=['ros2', 'topic', 'pub',
+                                cmd=['ros2', 'topic', 'pub', '-1',
                                      f'/{robot_name}/cmd_vel', 'geometry_msgs/msg/Twist',
-                                     '"{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"'],
+                                     '{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}'],
                                 output='screen'
                             )
                         ]
@@ -550,10 +382,34 @@ def generate_full_hardware_stack(context):
     else:
         namespaced_actions.append(LogInfo(msg='>>> Skipping Nudge...'))
 
-    # Return: micro_ros_agent runs OUTSIDE the GroupAction (it uses
-    # ExecuteProcess with explicit namespace), all ROS nodes run inside.
-    return [GroupAction(actions=namespaced_actions)]
+    # # Stage 2: Nav2 (15 s delay - 5s after Nudge starts)
+     namespaced_actions.append(
+         TimerAction(
+             period=25.0,
+             actions=[
+                 GroupAction(actions=[
+                     PushRosNamespace(robot_name),
+                     LogInfo(msg=f'>>> [{robot_name}] Stage 2: Starting Nav2 Navigation...'),
+                 ])
+             ] + nav2_nodes
+         )
+     )
 
+    # # Stage 3: Exploration (22 s delay - 7s after Nav2 starts to allow costmaps to form)
+     namespaced_actions.append(
+         TimerAction(
+             period=30.0,
+             actions=[
+                 GroupAction(actions=[
+                     PushRosNamespace(robot_name),
+                     LogInfo(msg=f'>>> [{robot_name}] Stage 3: Starting Frontier Exploration...'),
+                     exploration_server,
+                 ])
+             ]
+         )
+     )
+
+    return [GroupAction(actions=namespaced_actions)]
 
 def generate_launch_description():
     return LaunchDescription([

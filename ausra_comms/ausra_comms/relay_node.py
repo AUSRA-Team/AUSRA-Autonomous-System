@@ -7,9 +7,11 @@ import zlib
 
 import rclpy
 from rclpy.node import Node
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from nav_msgs.msg import OccupancyGrid
-from std_msgs.msg import ByteMultiArray, MultiArrayDimension, MultiArrayLayout, String
+from std_msgs.msg import UInt8MultiArray, MultiArrayDimension, MultiArrayLayout, String
 
 
 class RelayNode(Node):
@@ -19,7 +21,7 @@ class RelayNode(Node):
         self.declare_parameter('robot_name', 'ausra_1')
         self.declare_parameter('map_interval_sec', 5.0)
         self.declare_parameter('base_station_ip', '192.168.0.105')
-        self.declare_parameter('enable_compression', False)
+        self.declare_parameter('enable_compression', True)
         self.declare_parameter('enable_adaptive_throttle', True)
         self.declare_parameter('enable_delta_detection', True)
         self.declare_parameter('delta_threshold', 0.01)
@@ -48,31 +50,42 @@ class RelayNode(Node):
 
         prefix = f'/{self.robot_name}'
 
-        # Use TRANSIENT_LOCAL so relay receives the last map even if SLAM published before relay started
+        # ReentrantCallbackGroup lets the map callback (which runs the heavy
+        # zlib compression) execute concurrently with the heartbeat timer under
+        # the MultiThreadedExecutor, so a slow compress never stalls heartbeats.
+        self.cb_group = ReentrantCallbackGroup()
+
+        # slam_toolbox publishes /map with TRANSIENT_LOCAL + RELIABLE. The relay
+        # subscriber, the raw /map publisher, AND the compressed publisher all
+        # match this so the base station receives the last map even if it starts
+        # after the Jetson, or after a brief WiFi blip. depth=2 absorbs jitter.
         map_qos = QoSProfile(
-            depth=1,
+            depth=2,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
             reliability=ReliabilityPolicy.RELIABLE,
         )
 
-        self.map_pub = self.create_publisher(
-            OccupancyGrid, f'{prefix}/map', map_qos)
-
+        # When compression is enabled we send ONLY the compressed topic to keep
+        # the WiFi/Zenoh budget low; otherwise we send the raw OccupancyGrid.
         if self.enable_compression:
+            self.map_pub = None
             self.map_compressed_pub = self.create_publisher(
-                ByteMultiArray, f'{prefix}/map_compressed',
-                QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE))
+                UInt8MultiArray, f'{prefix}/map_compressed', map_qos)
         else:
+            self.map_pub = self.create_publisher(
+                OccupancyGrid, f'{prefix}/map', map_qos)
             self.map_compressed_pub = None
 
         # Subscribe to both namespaced and global map topics
         self.map_sub_ns = self.create_subscription(
-            OccupancyGrid, f'{prefix}/map', self.map_cb_ns, map_qos)
+            OccupancyGrid, f'{prefix}/map', self.map_cb_ns, map_qos,
+            callback_group=self.cb_group)
         self.map_sub_global = self.create_subscription(
-            OccupancyGrid, '/map', self.map_cb_global, map_qos)
+            OccupancyGrid, '/map', self.map_cb_global, map_qos,
+            callback_group=self.cb_group)
 
         self.hb_pub = self.create_publisher(String, f'{prefix}/heartbeat', 10)
-        self.create_timer(1.0, self.heartbeat_cb)
+        self.create_timer(1.0, self.heartbeat_cb, callback_group=self.cb_group)
 
         if self.enable_adaptive:
             self._latency_thread = threading.Thread(
@@ -97,18 +110,26 @@ class RelayNode(Node):
         if now - self.last_map_sent < self.map_interval:
             return
 
+        # Advance the throttle clock here, BEFORE the delta check, so this var
+        # means "last map evaluated" not "last map sent". A stationary robot
+        # (maps keep getting delta-skipped) is then gated to one evaluation per
+        # map_interval instead of flooding the delta path — and the log — on
+        # every SLAM update. Tradeoff: the first changed map after the robot
+        # resumes motion can wait up to map_interval s, consistent with throttle intent.
+        self.last_map_sent = now
+
         if self.enable_delta and self._is_map_unchanged(msg):
             self.delta_skips += 1
             if self.delta_skips % 10 == 1:
                 self.get_logger().info(f'Delta skip #{self.delta_skips}')
             return
 
-        self.map_pub.publish(msg)
-
+        # Send compressed-only when compression is on, raw otherwise.
         if self.map_compressed_pub is not None:
             self._publish_compressed(msg)
+        else:
+            self.map_pub.publish(msg)
 
-        self.last_map_sent = now
         self.map_count += 1
 
         self.get_logger().info(
@@ -131,7 +152,13 @@ class RelayNode(Node):
         return False
 
     def _publish_compressed(self, msg):
-        """Compress map data and publish as ByteMultiArray."""
+        """Compress map data and publish as UInt8MultiArray.
+
+        UInt8MultiArray.data accepts a raw bytes/array directly, so it both
+        serializes efficiently and avoids the ByteMultiArray pitfall where each
+        element must be a separate `bytes` object (a list of ints raises an
+        AssertionError at publish time and silently sends nothing).
+        """
         metadata = {
             'ox': round(msg.info.origin.position.x, 6),
             'oy': round(msg.info.origin.position.y, 6),
@@ -149,21 +176,28 @@ class RelayNode(Node):
         }
         meta_json = json.dumps(metadata, separators=(',', ':'))
 
-        raw_data = bytes(msg.data)
+        # OccupancyGrid data is int8 (-1..100); pack to unsigned bytes for zlib.
+        raw_data = bytes(bytearray((b & 0xFF) for b in msg.data))
         compressed = zlib.compress(raw_data, level=6)
 
         self.last_raw_size = len(raw_data)
         self.last_compressed_size = len(compressed)
         self.total_bytes_saved += (self.last_raw_size - self.last_compressed_size)
 
-        out_msg = ByteMultiArray()
+        out_msg = UInt8MultiArray()
         out_msg.layout = MultiArrayLayout()
         out_msg.layout.dim = [
             MultiArrayDimension(label=meta_json, size=len(compressed), stride=0)
         ]
-        out_msg.data = list(compressed)
+        out_msg.data = compressed
 
         self.map_compressed_pub.publish(out_msg)
+
+        ratio = (1.0 - self.last_compressed_size / max(1, self.last_raw_size)) * 100
+        self.get_logger().info(
+            f'Compressed map: {self.last_raw_size}B → '
+            f'{self.last_compressed_size}B ({ratio:.1f}% saved)',
+            throttle_duration_sec=10.0)
 
     def heartbeat_cb(self):
         """Publish simple heartbeat."""
@@ -219,11 +253,14 @@ class RelayNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = RelayNode()
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         node.get_logger().info('Relay node shutting down')
     finally:
+        executor.shutdown()
         node.destroy_node()
         rclpy.shutdown()
 
