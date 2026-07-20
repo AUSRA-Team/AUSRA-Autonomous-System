@@ -12,35 +12,40 @@ This repository contains the high-level ROS 2 Humble software stack, hardware br
 
 ## 🎬 Real-World Results & System Showcase
 
-The **AUSRA Autonomous System** is engineered for real-world autonomous search-and-rescue operations, multi-robot fleet mapping, and precise victim/target localization. The video demonstrations below highlight the complete operational pipeline across physical hardware and simulation:
+The **AUSRA Autonomous System** is engineered for real-world autonomous search-and-rescue operations, multi-robot fleet mapping, and precise victim/target localization. Below are the operational video demonstrations highlighting our hardware and simulation results:
+
+### 🤖 1. Autonomous Single-Robot Frontier Exploration
+Physical 3-wheel omnidirectional AUSRA robot dynamically mapping unknown terrain using RPLIDAR A1, `slam_toolbox`, and autonomous frontier exploration (`explore_lite`).
+
+<p align="center">
+  <video src="docs/single_robot_exploration.mp4" width="85%" controls loop muted></video>
+</p>
+
+---
+
+### 🌐 2. Multi-Robot Fleet Swarm & Distributed Map Fusion
+Multi-agent fleet coordination and real-time distributed map merging (`ausra_map_merge_HW`) over a low-latency Zenoh cross-WiFi network bridge.
+
+<p align="center">
+  <video src="docs/multi_robot_simualtion.mp4" width="85%" controls loop muted></video>
+</p>
+
+---
+
+### 🎯 Real-Time Victim & Target Localization Pipeline
+Real-world hardware camera feed synchronized with real-time RViz spatial mapping on the global occupancy grid:
 
 <table width="100%">
   <tr>
     <td width="50%" align="center" valign="top">
-      <h3>🤖 Single-Robot Autonomous Exploration</h3>
-      <img src="docs/single_robot_exploration.gif" width="100%" alt="Single-Robot Autonomous Exploration"/>
-      <p><em>Physical 3-wheel omnidirectional AUSRA robot dynamically mapping unknown terrain using RPLIDAR A1, <code>slam_toolbox</code>, and autonomous frontier exploration (<code>explore_lite</code>).</em></p>
-      <p><a href="docs/single_robot_exploration.mp4">📹 Download Full MP4 Video</a></p>
-    </td>
-    <td width="50%" align="center" valign="top">
-      <h3>🌐 Multi-Robot Fleet Swarm & Map Fusion</h3>
-      <img src="docs/multi_robot_simualtion.gif" width="100%" alt="Multi-Robot Fleet Swarm & Map Fusion"/>
-      <p><em>Multi-agent fleet coordination and real-time distributed map merging (<code>ausra_map_merge_HW</code>) over a low-latency Zenoh cross-WiFi network bridge.</em></p>
-      <p><a href="docs/multi_robot_simualtion.mp4">📹 Download Full MP4 Video</a></p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="top">
-      <h3>🎯 Victim Localization (Real Hardware Camera)</h3>
-      <img src="docs/victim_localization_real.gif" width="100%" alt="Victim Localization Real Hardware Camera"/>
+      <h3>Real Hardware Camera Feed</h3>
+      <video src="docs/victim_localization_real.mp4" width="100%" controls loop muted></video>
       <p><em>On-board hardware vision and sensor pipeline detecting and localizing targets/victims in real physical environments.</em></p>
-      <p><a href="docs/victim_localization_real.mp4">📹 Download Full MP4 Video</a></p>
     </td>
     <td width="50%" align="center" valign="top">
-      <h3>🗺️ Victim Localization (Real-Time RViz Map)</h3>
-      <img src="docs/victim_localization_map.gif" width="100%" alt="Victim Localization Real-Time RViz Map"/>
+      <h3>Real-Time RViz Global Map</h3>
+      <video src="docs/victim_localization_map.mp4" width="100%" controls loop muted></video>
       <p><em>Real-time victim spatial mapping and target coordinate estimation rendered directly on the global RViz occupancy grid.</em></p>
-      <p><a href="docs/victim_localization_map.mp4">📹 Download Full MP4 Video</a></p>
     </td>
   </tr>
 </table>
