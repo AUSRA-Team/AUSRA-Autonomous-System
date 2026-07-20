@@ -18,25 +18,29 @@ The **AUSRA Autonomous System** is engineered for real-world autonomous search-a
   <tr>
     <td width="50%" align="center" valign="top">
       <h3>🤖 Single-Robot Autonomous Exploration</h3>
-      <video src="docs/single_robot_exploration.mp4" width="100%" controls loop muted poster="docs/figures/Chapter 6/hw_tape_measure_photo.jpeg"></video>
+      <img src="docs/single_robot_exploration.gif" width="100%" alt="Single-Robot Autonomous Exploration"/>
       <p><em>Physical 3-wheel omnidirectional AUSRA robot dynamically mapping unknown terrain using RPLIDAR A1, <code>slam_toolbox</code>, and autonomous frontier exploration (<code>explore_lite</code>).</em></p>
+      <p><a href="docs/single_robot_exploration.mp4">📹 Download Full MP4 Video</a></p>
     </td>
     <td width="50%" align="center" valign="top">
       <h3>🌐 Multi-Robot Fleet Swarm & Map Fusion</h3>
-      <video src="docs/multi_robot_simualtion.mp4" width="100%" controls loop muted poster="docs/figures/Chapter 6/gui_tab_fleet_commander.png"></video>
+      <img src="docs/multi_robot_simualtion.gif" width="100%" alt="Multi-Robot Fleet Swarm & Map Fusion"/>
       <p><em>Multi-agent fleet coordination and real-time distributed map merging (<code>ausra_map_merge_HW</code>) over a low-latency Zenoh cross-WiFi network bridge.</em></p>
+      <p><a href="docs/multi_robot_simualtion.mp4">📹 Download Full MP4 Video</a></p>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
       <h3>🎯 Victim Localization (Real Hardware Camera)</h3>
-      <video src="docs/victim_localization_real.mp4" width="100%" controls loop muted poster="docs/figures/Chapter 6/hw_final_real_world_final_poses.jpeg"></video>
+      <img src="docs/victim_localization_real.gif" width="100%" alt="Victim Localization Real Hardware Camera"/>
       <p><em>On-board hardware vision and sensor pipeline detecting and localizing targets/victims in real physical environments.</em></p>
+      <p><a href="docs/victim_localization_real.mp4">📹 Download Full MP4 Video</a></p>
     </td>
     <td width="50%" align="center" valign="top">
       <h3>🗺️ Victim Localization (Real-Time RViz Map)</h3>
-      <video src="docs/victim_localization_map.mp4" width="100%" controls loop muted poster="docs/figures/Chapter 6/hw_final_rviz_map.jpeg"></video>
+      <img src="docs/victim_localization_map.gif" width="100%" alt="Victim Localization Real-Time RViz Map"/>
       <p><em>Real-time victim spatial mapping and target coordinate estimation rendered directly on the global RViz occupancy grid.</em></p>
+      <p><a href="docs/victim_localization_map.mp4">📹 Download Full MP4 Video</a></p>
     </td>
   </tr>
 </table>
