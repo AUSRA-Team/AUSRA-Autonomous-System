@@ -17,7 +17,10 @@ The **AUSRA Autonomous System** is engineered for real-world autonomous search-a
 ### 🤖 1. Autonomous Single-Robot Frontier Exploration
 Physical 3-wheel omnidirectional AUSRA robot dynamically mapping unknown terrain using RPLIDAR A1, `slam_toolbox`, and autonomous frontier exploration (`explore_lite`).
 
-https://github.com/user-attachments/assets/b2b29107-5dd7-4589-a462-2b5897406586
+
+
+https://github.com/user-attachments/assets/378b6f05-c8b2-4147-b75b-2e180a736b0f
+
 
 
 ---
@@ -25,29 +28,25 @@ https://github.com/user-attachments/assets/b2b29107-5dd7-4589-a462-2b5897406586
 ### 🌐 2. Multi-Robot Fleet Swarm & Distributed Map Fusion
 Multi-agent fleet coordination and real-time distributed map merging (`ausra_map_merge_HW`) over a low-latency Zenoh cross-WiFi network bridge.
 
-<p align="center">
-  <video src="docs/multi_robot_simualtion.mp4" width="85%" controls loop muted></video>
-</p>
+
+https://github.com/user-attachments/assets/e65e6559-7056-49b4-b006-e99481ff214d
+
+
 
 ---
 
 ### 🎯 Real-Time Victim & Target Localization Pipeline
 Real-world hardware camera feed synchronized with real-time RViz spatial mapping on the global occupancy grid:
 
-<table width="100%">
-  <tr>
-    <td width="50%" align="center" valign="top">
-      <h3>Real Hardware Camera Feed</h3>
-      <video src="docs/victim_localization_real.mp4" width="100%" controls loop muted></video>
-      <p><em>On-board hardware vision and sensor pipeline detecting and localizing targets/victims in real physical environments.</em></p>
-    </td>
-    <td width="50%" align="center" valign="top">
-      <h3>Real-Time RViz Global Map</h3>
-      <video src="docs/victim_localization_map.mp4" width="100%" controls loop muted></video>
-      <p><em>Real-time victim spatial mapping and target coordinate estimation rendered directly on the global RViz occupancy grid.</em></p>
-    </td>
-  </tr>
-</table>
+
+
+https://github.com/user-attachments/assets/38e46f71-5ee4-4406-aa62-e213c09e270d
+
+
+
+
+https://github.com/user-attachments/assets/64772b6b-0a27-4168-82cf-413389d60227
+
 
 ---
 
