@@ -21,6 +21,9 @@ Physical 3-wheel omnidirectional AUSRA robot dynamically mapping unknown terrain
   <video src="docs/single_robot_exploration.mp4" width="85%" controls loop muted></video>
 </p>
 
+https://github.com/user-attachments/assets/b2b29107-5dd7-4589-a462-2b5897406586
+
+
 ---
 
 ### 🌐 2. Multi-Robot Fleet Swarm & Distributed Map Fusion
