@@ -17,10 +17,6 @@ The **AUSRA Autonomous System** is engineered for real-world autonomous search-a
 ### 🤖 1. Autonomous Single-Robot Frontier Exploration
 Physical 3-wheel omnidirectional AUSRA robot dynamically mapping unknown terrain using RPLIDAR A1, `slam_toolbox`, and autonomous frontier exploration (`explore_lite`).
 
-<p align="center">
-  <video src="docs/single_robot_exploration.mp4" width="85%" controls loop muted></video>
-</p>
-
 https://github.com/user-attachments/assets/b2b29107-5dd7-4589-a462-2b5897406586
 
 
